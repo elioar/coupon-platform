@@ -1,0 +1,211 @@
+{
+  "common": {
+    "appName": "CouponMe",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All"
+  },
+  "nav": {
+    "home": "Home",
+    "coupons": "Coupons",
+    "membership": "Membership",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "dashboard": "Dashboard",
+    "profile": "Profile"
+  },
+  "home": {
+    "hero": {
+      "title": "Save Big with Exclusive",
+      "titleHighlight": "Discount Coupons",
+      "subtitle": "Save money on your favorite brands",
+      "description": "Discover verified deals from trusted businesses. Unlock unlimited savings with premium membership.",
+      "banner": "Join Thousands of Smart Shoppers",
+      "joinNow": "Join Now",
+      "browseCoupons": "Explore Coupons",
+      "learnMore": "Learn More"
+    },
+    "features": {
+      "title": "Why Choose CouponMe?",
+      "subtitle": "Everything you need to save money",
+      "verified": {
+        "title": "Verified Coupons",
+        "description": "All discount codes are verified and tested before being published"
+      },
+      "unlimited": {
+        "title": "Unlimited Access",
+        "description": "Members get unlimited access to all coupon codes and exclusive deals"
+      },
+      "categories": {
+        "title": "Wide Variety",
+        "description": "Browse coupons across multiple categories from fashion to electronics"
+      },
+      "easy": {
+        "title": "Easy to Use",
+        "description": "Simple, intuitive interface to find and use coupons in seconds"
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Get started in 3 simple steps",
+      "step1": {
+        "title": "Browse Coupons",
+        "description": "Explore our collection of verified discount codes from top brands"
+      },
+      "step2": {
+        "title": "Become a Member",
+        "description": "Subscribe for just €10/year to unlock all coupon codes instantly"
+      },
+      "step3": {
+        "title": "Save Money",
+        "description": "Copy codes and use them at checkout to enjoy amazing discounts"
+      }
+    },
+    "categories": {
+      "title": "Popular Categories",
+      "subtitle": "Find deals in your favorite categories",
+      "viewAll": "View All Categories"
+    },
+    "featured": {
+      "title": "Featured Coupons",
+      "subtitle": "Hand-picked deals just for you",
+      "viewAll": "View All Coupons"
+    },
+    "stats": {
+      "title": "Join thousands of happy savers",
+      "coupons": "Active Coupons",
+      "members": "Active Members",
+      "businesses": "Partner Businesses",
+      "savings": "Total Savings"
+    },
+    "cta": {
+      "title": "Ready to start saving?",
+      "description": "Join CouponMe today and unlock exclusive deals from your favorite brands",
+      "button": "Get Started Now"
+    },
+    "footer": "Built with Next.js & Tailwind CSS"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome Back",
+      "subtitle": "Sign in to your account",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign In",
+      "noAccount": "Don't have an account?",
+      "registerLink": "Register here",
+      "error": "Invalid email or password"
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Join CouponMe today",
+      "name": "Full Name",
+      "email": "Email",
+      "password": "Password",
+      "role": "Account Type",
+      "roleUser": "User (Browse and use coupons)",
+      "roleBusiness": "Business (Create and manage coupons)",
+      "submit": "Create Account",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in here",
+      "success": "Account created successfully!",
+      "error": "Registration failed"
+    }
+  },
+  "membership": {
+    "title": "Become a Member",
+    "subtitle": "Unlock unlimited access to all coupon codes",
+    "price": "€10/year",
+    "benefits": {
+      "title": "Membership Benefits",
+      "unlimited": "Unlimited access to all coupon codes",
+      "exclusive": "Exclusive deals from top brands",
+      "early": "Early access to new coupons",
+      "support": "Priority customer support"
+    },
+    "cta": "Subscribe Now",
+    "active": "Active Member",
+    "expires": "Membership expires on",
+    "renew": "Renew Membership",
+    "notMember": "You are not a member yet"
+  },
+  "coupons": {
+    "title": "Available Coupons",
+    "noCoupons": "No coupons available",
+    "filterByCategory": "Filter by category",
+    "discount": "OFF",
+    "expires": "Expires",
+    "getCode": "Get Code",
+    "becomeMember": "Become a Member to View Code",
+    "copiedCode": "Code copied!",
+    "copyCode": "Copy Code",
+    "details": "Details",
+    "category": "Category",
+    "code": "Discount Code"
+  },
+  "dashboard": {
+    "user": {
+      "title": "My Dashboard",
+      "membershipStatus": "Membership Status",
+      "availableCoupons": "Available Coupons"
+    },
+    "business": {
+      "title": "Business Dashboard",
+      "myCoupons": "My Coupons",
+      "createCoupon": "Create New Coupon",
+      "noCoupons": "You haven't created any coupons yet",
+      "pending": "Pending Approval",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "admin": {
+      "title": "Admin Dashboard",
+      "pendingCoupons": "Pending Coupons",
+      "allUsers": "All Users",
+      "statistics": "Statistics",
+      "totalCoupons": "Total Coupons",
+      "activeMembers": "Active Members",
+      "totalBusinesses": "Total Businesses",
+      "approve": "Approve",
+      "reject": "Reject",
+      "manageUsers": "Manage Users",
+      "manageCoupons": "Manage Coupons"
+    }
+  },
+  "couponForm": {
+    "title": "Coupon Title",
+    "description": "Description",
+    "code": "Discount Code",
+    "category": "Category",
+    "discountPercentage": "Discount Percentage",
+    "expirationDate": "Expiration Date",
+    "image": "Coupon Image",
+    "submit": "Create Coupon",
+    "update": "Update Coupon",
+    "success": "Coupon created successfully!",
+    "error": "Failed to create coupon",
+    "uploadImage": "Upload Image"
+  },
+  "categories": {
+    "fashion": "Fashion",
+    "electronics": "Electronics",
+    "food": "Food & Dining",
+    "travel": "Travel",
+    "beauty": "Beauty & Health",
+    "home": "Home & Garden",
+    "sports": "Sports & Fitness",
+    "entertainment": "Entertainment",
+    "other": "Other"
+  }
+}
+
