@@ -6,6 +6,13 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
 
+    if (!stripe) {
+      return NextResponse.json(
+        { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables." },
+        { status: 503 }
+      )
+    }
+
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
