@@ -28,6 +28,6 @@ export { isMemberUtil as isMember }
 
 export async function isCurrentUserMember(): Promise<boolean> {
   const user = await getCurrentUser()
-  return isMemberUtil(user)
+  return isMemberUtil(user ? { membershipExpiry: user.membershipExpiry } : null)
 }
 
