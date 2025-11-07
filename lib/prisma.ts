@@ -6,7 +6,14 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  return new PrismaClient().$extends(withAccelerate())
+  const client = new PrismaClient()
+  
+  // Only use Accelerate if PRISMA_ACCELERATE_URL is provided
+  if (process.env.PRISMA_ACCELERATE_URL) {
+    return client.$extends(withAccelerate())
+  }
+  
+  return client
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()

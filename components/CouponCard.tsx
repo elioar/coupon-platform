@@ -19,9 +19,10 @@ interface Coupon {
     nameEn: string
     nameEl: string
   }
-  business: {
+  business?: {
     id: string
     name: string
+    email?: string
   }
 }
 

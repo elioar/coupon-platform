@@ -15,7 +15,7 @@ interface Coupon {
   discountPercentage: number
   expirationDate: string
   status: string
-  business: {
+  business?: {
     id: string
     name: string
     email: string
@@ -546,9 +546,11 @@ export default function AdminDashboard() {
                                   <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
                                     {coupon.title}
                                   </h3>
-                                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                                    By <strong>{coupon.business.name}</strong> ({coupon.business.email})
-                                  </p>
+                                  {coupon.business && (
+                                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                      By <strong>{coupon.business.name}</strong> ({coupon.business.email})
+                                    </p>
+                                  )}
                                 </div>
                                 <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
                                   {coupon.discountPercentage}% OFF

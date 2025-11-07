@@ -19,9 +19,10 @@ interface Coupon {
     nameEn: string
     nameEl: string
   }
-  business: {
+  business?: {
     id: string
     name: string
+    email?: string
   }
 }
 
@@ -105,9 +106,11 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
             {coupon.title}
           </h2>
 
-          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-            By {coupon.business.name}
-          </p>
+          {coupon.business && (
+            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+              By {coupon.business.name}
+            </p>
+          )}
 
           <p className="mb-6 text-zinc-700 dark:text-zinc-300">
             {coupon.description}
