@@ -1,7 +1,9 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from './auth';
-import { locales } from './i18n/request';
+import { getToken } from 'next-auth/jwt';
+
+// Inline locales to avoid importing from i18n/request (reduces bundle size)
+const locales = ['en', 'el'] as const;
 
 // Create the i18n middleware
 const intlMiddleware = createMiddleware({
@@ -25,32 +27,36 @@ export async function middleware(request: NextRequest) {
   const publicPaths = ["/", "/login", "/register", "/coupons", "/membership"];
   const isPublicPath = publicPaths.includes(pathWithoutLocale);
 
-  // Get session
-  const session = await auth();
+  // Get token (lighter than full auth() - doesn't import Prisma)
+  const token = await getToken({ 
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET 
+  });
 
   // Redirect authenticated users away from login/register
-  if (session && (pathWithoutLocale.includes("/login") || pathWithoutLocale.includes("/register"))) {
+  if (token && (pathWithoutLocale.includes("/login") || pathWithoutLocale.includes("/register"))) {
     return NextResponse.redirect(new URL(`/${pathnameLocale}`, request.url));
   }
 
   // Protect dashboard routes
   if (pathWithoutLocale.includes("/dashboard")) {
-    if (!session) {
+    if (!token) {
       const loginUrl = new URL(`/${pathnameLocale}/login`, request.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
     // Role-based access control
-    if (pathWithoutLocale.includes("/dashboard/admin") && session.user.role !== "ADMIN") {
+    const userRole = token.role as string;
+    if (pathWithoutLocale.includes("/dashboard/admin") && userRole !== "ADMIN") {
       return NextResponse.redirect(new URL(`/${pathnameLocale}`, request.url));
     }
 
-    if (pathWithoutLocale.includes("/dashboard/business") && session.user.role !== "BUSINESS") {
+    if (pathWithoutLocale.includes("/dashboard/business") && userRole !== "BUSINESS") {
       return NextResponse.redirect(new URL(`/${pathnameLocale}`, request.url));
     }
 
-    if (pathWithoutLocale.includes("/dashboard/user") && session.user.role !== "USER") {
+    if (pathWithoutLocale.includes("/dashboard/user") && userRole !== "USER") {
       return NextResponse.redirect(new URL(`/${pathnameLocale}`, request.url));
     }
   }
