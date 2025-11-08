@@ -2,7 +2,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground:rgb(19, 19, 19);
+  --foreground:rgb(26, 26, 26);
 }
 
 @theme inline {
@@ -29,4 +29,104 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Shine animation for hero button */
+@keyframes shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Noise texture animation */
+@keyframes noise {
+  0%, 100% {
+    background-position: 0 0;
+  }
+  10% {
+    background-position: -5% -10%;
+  }
+  20% {
+    background-position: -15% 5%;
+  }
+  30% {
+    background-position: 7% -25%;
+  }
+  40% {
+    background-position: 20% 25%;
+  }
+  50% {
+    background-position: -25% 10%;
+  }
+  60% {
+    background-position: 15% 5%;
+  }
+  70% {
+    background-position: 0% 15%;
+  }
+  80% {
+    background-position: 3% 35%;
+  }
+  90% {
+    background-position: -10% 10%;
+  }
+}
+
+.hero-button-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-button-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shine 3s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hero-button-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.03) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.03) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 3px
+    );
+  background-size: 20px 20px;
+  animation: noise 0.5s steps(8) infinite;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
 }

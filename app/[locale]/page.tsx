@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import Navigation from '@/components/Navigation';
 import CouponCard from '@/components/CouponCard';
 import { isMember } from '@/lib/client-utils';
@@ -121,130 +122,251 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
             {/* Left Side - Hero Content */}
             <div className="lg:col-span-2">
               {/* Top Banner */}
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 dark:bg-green-900/30">
-                <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="mb-6 inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 dark:bg-green-900/30"
+              >
+                <motion.svg
+                  initial={{ rotate: -180, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ duration: 0.6, delay: 0.2, type: "spring" }}
+                  className="h-4 w-4 text-green-600 dark:text-green-400"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
+                </motion.svg>
                 <span className="text-sm font-medium text-green-700 dark:text-green-300">
                   {t('hero.banner')}
                 </span>
-              </div>
+              </motion.div>
 
               {/* Main Headline */}
-              <h1 className="text-4xl font-bold leading-tight text-zinc-900 dark:text-zinc-50 sm:text-5xl lg:text-6xl">
-                {t('hero.title')}{' '}
-                <span className="text-green-600 dark:text-green-400">
+              <motion.h1
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="text-4xl font-bold leading-tight text-zinc-900 dark:text-zinc-50 sm:text-5xl lg:text-6xl"
+              >
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                >
+                  {t('hero.title')}{' '}
+                </motion.span>
+                <motion.span
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.7 }}
+                  className="text-green-600 dark:text-green-400"
+                >
                   {t('hero.titleHighlight')}
-                </span>
-              </h1>
+                </motion.span>
+              </motion.h1>
 
               {/* Description */}
-              <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.9 }}
+                className="mt-6 text-lg text-zinc-600 dark:text-zinc-400"
+              >
                 {t('hero.description')}
-              </p>
+              </motion.p>
 
               {/* CTA Button */}
-              <div className="mt-8">
-                <Link
-                  href={`/${locale}/coupons`}
-                  className="group inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-8 font-semibold text-white shadow-lg transition-all hover:from-green-600 hover:to-emerald-600 hover:shadow-xl"
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 1.1, type: "spring", stiffness: 200 }}
+                className="mt-8"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  {t('hero.browseCoupons')}
-                </Link>
-              </div>
+                  <Link
+                    href={`/${locale}/coupons`}
+                    className="hero-button-glow group relative inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-8 font-semibold text-white shadow-lg transition-all hover:from-green-600 hover:to-emerald-600 hover:shadow-xl"
+                  >
+                    <motion.span
+                      className="relative z-10 flex items-center gap-2"
+                      whileHover={{ x: 5 }}
+                      transition={{ type: "spring", stiffness: 400 }}
+                    >
+                      <motion.svg
+                        className="h-5 w-5"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                      >
+                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </motion.svg>
+                      {t('hero.browseCoupons')}
+                    </motion.span>
+                  </Link>
+                </motion.div>
+              </motion.div>
 
               {/* Statistics */}
-              <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-                    <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                      {stats.totalCoupons}+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 1.3 }}
+                className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4"
+              >
+                {[
+                  {
+                    icon: (
+                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    ),
+                    bgColor: "bg-green-100 dark:bg-green-900/30",
+                    value: `${stats.totalCoupons}+`,
+                    label: t('stats.coupons'),
+                    delay: 0.1
+                  },
+                  {
+                    icon: (
+                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    ),
+                    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+                    value: `${stats.totalBusinesses}+`,
+                    label: t('stats.businesses'),
+                    delay: 0.2
+                  },
+                  {
+                    icon: (
+                      <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    ),
+                    bgColor: "bg-amber-100 dark:bg-amber-900/30",
+                    value: `€${stats.totalCoupons * 10}K+`,
+                    label: t('stats.savings'),
+                    delay: 0.3
+                  },
+                  {
+                    icon: (
+                      <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    ),
+                    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+                    value: `${stats.activeMembers}+`,
+                    label: t('stats.members'),
+                    delay: 0.4
+                  }
+                ].map((stat, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 1.3 + stat.delay }}
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    className="flex items-center gap-3"
+                  >
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, delay: 1.3 + stat.delay, type: "spring" }}
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.bgColor}`}
+                    >
+                      {stat.icon}
+                    </motion.div>
+                    <div>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5, delay: 1.5 + stat.delay }}
+                        className="text-2xl font-bold text-zinc-900 dark:text-zinc-50"
+                      >
+                        {stat.value}
+                      </motion.div>
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                        {stat.label}
+                      </div>
                     </div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                      {t('stats.coupons')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                      {stats.totalBusinesses}+
-                    </div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                      {t('stats.businesses')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                    <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                      €{stats.totalCoupons * 10}K+
-                    </div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                      {t('stats.savings')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                    <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                      {stats.activeMembers}+
-                    </div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                      {t('stats.members')}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                ))}
+              </motion.div>
             </div>
 
             {/* Right Side - Trending Deals */}
-            <div className="lg:col-span-1">
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="lg:col-span-1"
+            >
+              <motion.div
+                whileHover={{ y: -5 }}
+                transition={{ type: "spring", stiffness: 300 }}
+                className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+              >
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.7 }}
+                  className="mb-6 flex items-center justify-between"
+                >
                   <div className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-orange-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <motion.svg
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                      className="h-5 w-5 text-orange-500"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                       <path d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-                    </svg>
+                    </motion.svg>
                     <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
                       {t('featured.title')}
                     </h2>
                   </div>
-                  <svg className="h-5 w-5 text-yellow-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <motion.svg
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="h-5 w-5 text-yellow-500"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+                  </motion.svg>
+                </motion.div>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.8 }}
+                  className="mb-6 text-sm text-zinc-600 dark:text-zinc-400"
+                >
                   {t('featured.subtitle')}
-                </p>
+                </motion.p>
 
                 {/* Deal Listings */}
                 {loading ? (
@@ -253,12 +375,18 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
                   </div>
                 ) : featuredCoupons.length > 0 ? (
                   <div className="space-y-4">
-                    {featuredCoupons.slice(0, 3).map((coupon) => (
-                      <Link
+                    {featuredCoupons.slice(0, 3).map((coupon, index) => (
+                      <motion.div
                         key={coupon.id}
-                        href={`/${locale}/coupons`}
-                        className="group flex items-center gap-3 rounded-lg border-b border-zinc-100 pb-4 transition hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50 last:border-0"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.9 + index * 0.1 }}
+                        whileHover={{ x: 5, scale: 1.02 }}
                       >
+                        <Link
+                          href={`/${locale}/coupons`}
+                          className="group flex items-center gap-3 rounded-lg border-b border-zinc-100 pb-4 transition hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50 last:border-0"
+                        >
                         {coupon.imagePath ? (
                           <img
                             src={coupon.imagePath}
@@ -289,6 +417,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
                           </div>
                         </div>
                       </Link>
+                      </motion.div>
                     ))}
                   </div>
                 ) : (
@@ -296,8 +425,8 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
                     No deals available
                   </div>
                 )}
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
         </div>
       </section>
