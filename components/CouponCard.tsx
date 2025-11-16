@@ -29,7 +29,7 @@ interface CouponCardProps {
   coupon: Coupon
   isMember: boolean
   locale: string
-  onDetailsClick: () => void
+  onDetailsClick?: () => void   // ⬅️ add ?
 }
 
 export default function CouponCard({ coupon, isMember, locale, onDetailsClick }: CouponCardProps) {
@@ -109,7 +109,7 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
           </p>
 
           <button
-            onClick={onDetailsClick}
+            onClick={() => onDetailsClick?.()} 
             className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition-all duration-300 hover:from-green-700 hover:to-emerald-700 hover:shadow-xl hover:shadow-green-500/50 active:scale-95"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
