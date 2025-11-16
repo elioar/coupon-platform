@@ -123,7 +123,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.membershipExpiry = (token.membershipExpiry as string | null) ?? null
         session.user.name = (token.name as string) ?? session.user.name
         session.user.address = (token.address as string | null) ?? null
-        session.user.birthDate = (token.birthDate as string | null) ?? null
+        session.user.birthDate = token.birthDate
+          ? new Date(token.birthDate as string)
+          : null
         session.user.phone = (token.phone as string | null) ?? null
         session.user.about = (token.about as string | null) ?? null
         session.user.businessDescription = (token.businessDescription as string | null) ?? null
