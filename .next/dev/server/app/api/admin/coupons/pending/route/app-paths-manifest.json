@@ -1,0 +1,3 @@
+{
+  "/api/admin/coupons/pending/route": "app/api/admin/coupons/pending/route.js"
+}

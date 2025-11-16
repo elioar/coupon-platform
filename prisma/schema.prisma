@@ -30,6 +30,19 @@ model User {
   email             String    @unique
   password          String
   name              String
+  address           String?
+  birthDate         DateTime?
+  phone             String?
+  about             String?   @db.Text
+  businessDescription String? @db.Text
+  businessCategories String[] @default([])
+  businessLocation  String?
+  businessWebsite   String?
+  businessInstagram String?
+  businessFacebook  String?
+  businessTikTok    String?
+  businessLatitude  Float?
+  businessLongitude Float?
   role              Role      @default(USER)
   membershipExpiry  DateTime?
   createdAt         DateTime  @default(now())

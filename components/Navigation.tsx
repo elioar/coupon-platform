@@ -308,6 +308,16 @@ export default function Navigation() {
                           {t("membership")}
                         </Link>
                       )}
+                      <Link
+                        href={`/${locale}/profile`}
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        <svg className="h-4.5 w-4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 12a5 5 0 10-5-5 5 5 0 005 5zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" />
+                        </svg>
+                        {t("profile")}
+                      </Link>
                       <div className="my-1.5 h-px bg-zinc-100 dark:bg-zinc-800" />
                       <button
                         onClick={() => {
@@ -525,11 +535,23 @@ export default function Navigation() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200 dark:bg-green-900/30 dark:group-hover:bg-green-900/50 flex-shrink-0">
                           <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                             <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                          </svg>
-                        </div>
-                        <span>{t("membership")}</span>
-                      </Link>
-                    )}
+                        </svg>
+                      </div>
+                      <span>{t("membership")}</span>
+                    </Link>
+                  )}
+                    <Link
+                      href={`/${locale}/profile`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 transition-colors group-hover:bg-zinc-200 dark:bg-zinc-800/60 dark:group-hover:bg-zinc-700 flex-shrink-0">
+                        <svg className="h-4 w-4 text-zinc-600 dark:text-zinc-300" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 12a5 5 0 10-5-5 5 5 0 005 5zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" />
+                        </svg>
+                      </div>
+                      <span>{t("profile")}</span>
+                    </Link>
                   </>
                 ) : (
                   <>

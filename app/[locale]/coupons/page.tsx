@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -28,7 +28,11 @@ interface Coupon {
   business: {
     id: string
     name: string
+    businessLocation?: string | null
+    businessLatitude?: number | null
+    businessLongitude?: number | null
   }
+  distanceKm?: number | null
 }
 
 interface Category {
@@ -61,6 +65,13 @@ export default function CouponsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
   const [currentPage, setCurrentPage] = useState(getInitialPage)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [nearMeEnabled, setNearMeEnabled] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [geolocationSupported, setGeolocationSupported] = useState(false)
+  const [locationDescription, setLocationDescription] = useState<string | null>(null)
+  const watchIdRef = useRef<number | null>(null)
   const itemsPerPage = 9
 
   const userIsMember = session?.user ? isMember(session.user) : false
@@ -111,6 +122,12 @@ export default function CouponsPage() {
     setCurrentPage(normalizedPage)
   }, [searchParams])
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && "geolocation" in navigator) {
+      setGeolocationSupported(true)
+    }
+  }, [])
+
   const handleCategoryChange = (categoryId: string | null) => {
     setSelectedCategory(categoryId)
     setCurrentPage(1)
@@ -127,6 +144,174 @@ export default function CouponsPage() {
     setCurrentPage(page)
     updateUrlParams({ page })
   }
+
+  const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const toRad = (value: number) => (value * Math.PI) / 180
+    const R = 6371 // km
+    const dLat = toRad(lat2 - lat1)
+    const dLon = toRad(lon2 - lon1)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const handleNearMeClick = () => {
+    if (nearMeEnabled) {
+      setNearMeEnabled(false)
+      setLocationError(null)
+      setLocationDescription(null)
+      return
+    }
+
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setLocationError(t("nearMeInsecure"))
+      return
+    }
+
+    if (!geolocationSupported) {
+      setLocationError(t("nearMeUnsupported"))
+      return
+    }
+
+    setLocationError(null)
+    setNearMeEnabled(true)
+  }
+
+  useEffect(() => {
+    if (!nearMeEnabled) {
+      setLocationDescription(null)
+      if (watchIdRef.current !== null && typeof navigator !== "undefined") {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+      setLocationLoading(false)
+      return
+    }
+
+    if (!geolocationSupported) {
+      setLocationError(t("nearMeUnsupported"))
+      setNearMeEnabled(false)
+      return
+    }
+
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setLocationError(t("nearMeInsecure"))
+      setNearMeEnabled(false)
+      return
+    }
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationError(t("nearMeUnsupported"))
+      setNearMeEnabled(false)
+      return
+    }
+
+    setLocationLoading(true)
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }
+        setUserLocation(coords)
+        setLocationLoading(false)
+        setLocationError(null)
+      },
+      (error) => {
+        console.error("Geolocation error:", error)
+        const reason = (() => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              return t("nearMePermissionDenied")
+            case error.POSITION_UNAVAILABLE:
+              return t("nearMePositionUnavailable")
+            case error.TIMEOUT:
+              return t("nearMeTimeout")
+            default:
+              return t("nearMeDenied")
+          }
+        })()
+        setLocationError(reason)
+        setLocationLoading(false)
+        setNearMeEnabled(false)
+        setLocationDescription(null)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 1000,
+      }
+    )
+
+    return () => {
+      if (watchIdRef.current !== null && typeof navigator !== "undefined") {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+    }
+  }, [nearMeEnabled, geolocationSupported, t])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const resolveCityName = async () => {
+      if (!nearMeEnabled || !userLocation) {
+        return
+      }
+
+      setLocationDescription(t("nearMeResolvingCity"))
+
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/reverse")
+        url.searchParams.set("format", "jsonv2")
+        url.searchParams.set("lat", userLocation.lat.toString())
+        url.searchParams.set("lon", userLocation.lng.toString())
+        url.searchParams.set("zoom", "10")
+        url.searchParams.set("addressdetails", "1")
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            "Accept-Language": locale,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to reverse geocode location")
+        }
+
+        const data = await response.json()
+        const address = data.address ?? {}
+        const resolvedCity =
+          address.city ||
+          address.town ||
+          address.village ||
+          address.municipality ||
+          address.county ||
+          address.state_district ||
+          address.state ||
+          null
+
+        if (!cancelled) {
+          const label = resolvedCity ?? t("nearMeUnknownCity")
+          setLocationDescription(t("nearMeCurrentLocation", { city: label }))
+        }
+      } catch (error) {
+        console.error("Reverse geocoding failed:", error)
+        if (!cancelled) {
+          setLocationDescription(t("nearMeCurrentLocation", { city: t("nearMeUnknownCity") }))
+        }
+      }
+    }
+
+    resolveCityName()
+
+    return () => {
+      cancelled = true
+    }
+  }, [nearMeEnabled, userLocation, locale, t])
 
   // Filter coupons based on search query and category
   const filteredCoupons = allCoupons.filter((coupon) => {
@@ -152,11 +337,40 @@ export default function CouponsPage() {
     return true
   })
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredCoupons.length / itemsPerPage)
+  const couponsWithDistance = filteredCoupons.map((coupon) => {
+    if (userLocation && typeof coupon.business?.businessLatitude === "number" && typeof coupon.business.businessLongitude === "number") {
+      const distanceKm = calculateDistanceInKm(
+        userLocation.lat,
+        userLocation.lng,
+        coupon.business.businessLatitude,
+        coupon.business.businessLongitude
+      )
+      return { ...coupon, distanceKm }
+    }
+    return { ...coupon, distanceKm: null }
+  })
+
+  const hasDistanceCoupons = couponsWithDistance.some((coupon) => typeof coupon.distanceKm === "number")
+
+  const sortedCoupons =
+    nearMeEnabled && userLocation
+      ? couponsWithDistance
+          .filter((coupon) => typeof coupon.distanceKm === "number")
+          .sort((a, b) => (a.distanceKm! - b.distanceKm!))
+      : couponsWithDistance
+
+  const totalPages = Math.ceil(sortedCoupons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedCoupons = filteredCoupons.slice(startIndex, endIndex)
+  const paginatedCoupons = sortedCoupons.slice(startIndex, endIndex)
+  const dealsMessage =
+    sortedCoupons.length > 0
+      ? `${sortedCoupons.length} ${
+          sortedCoupons.length === 1 ? t("exclusiveDeal") : t("exclusiveDeals")
+        } ${t("waitingForYou")}${
+          totalPages > 1 ? ` (${t("page")} ${currentPage} ${t("of")} ${totalPages})` : ""
+        }`
+      : ""
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -207,25 +421,6 @@ export default function CouponsPage() {
             >
               {t("title")}
             </motion.h1>
-            <AnimatePresence mode="wait">
-              {!loading && filteredCoupons.length > 0 && (
-                <motion.p
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                  key={`${filteredCoupons.length}-${currentPage}`}
-                  className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"
-                >
-                  {filteredCoupons.length} {filteredCoupons.length === 1 ? t('exclusiveDeal') : t('exclusiveDeals')} {t('waitingForYou')}
-                  {totalPages > 1 && (
-                    <span className="ml-2">
-                      ({t('page')} {currentPage} {t('of')} {totalPages})
-                    </span>
-                  )}
-                </motion.p>
-              )}
-            </AnimatePresence>
           </div>
         </motion.div>
         <motion.div
@@ -240,8 +435,26 @@ export default function CouponsPage() {
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             locale={locale}
+            nearMeEnabled={nearMeEnabled}
+            locationLoading={locationLoading}
+            geolocationSupported={geolocationSupported}
+            onNearMeClick={handleNearMeClick}
+            locationDescription={locationDescription}
+            locationError={locationError}
+            hasDistanceCoupons={hasDistanceCoupons}
           />
         </motion.div>
+
+        {!loading && dealsMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.25 }}
+            className="mb-6 rounded-2xl border border-green-100 bg-white/90 px-6 py-4 text-sm font-semibold text-green-700 shadow-sm dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100"
+          >
+            {dealsMessage}
+          </motion.div>
+        )}
 
         <AnimatePresence mode="wait">
           {loading ? (
@@ -283,7 +496,7 @@ export default function CouponsPage() {
                 </motion.div>
               ))}
             </motion.div>
-          ) : filteredCoupons.length === 0 ? (
+          ) : sortedCoupons.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -380,7 +593,7 @@ export default function CouponsPage() {
         </AnimatePresence>
 
         {/* Pagination Controls */}
-        {!loading && filteredCoupons.length > 0 && totalPages > 1 && (
+        {!loading && sortedCoupons.length > 0 && totalPages > 1 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -459,4 +672,3 @@ export default function CouponsPage() {
     </div>
   )
 }
-

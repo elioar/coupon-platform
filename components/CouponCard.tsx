@@ -22,7 +22,11 @@ interface Coupon {
     id: string
     name: string
     email?: string
+    businessLocation?: string | null
+    businessLatitude?: number | null
+    businessLongitude?: number | null
   }
+  distanceKm?: number | null
 }
 
 interface CouponCardProps {
@@ -37,6 +41,20 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
   const [isHovered, setIsHovered] = useState(false)
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
+  const numberFormatter = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const integerFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
+  const locationText = coupon.business?.businessLocation || null
+
+  const distanceLabel = (() => {
+    if (typeof coupon.distanceKm !== "number") {
+      return null
+    }
+    if (coupon.distanceKm >= 1) {
+      return t("distanceAwayKm", { distance: numberFormatter.format(coupon.distanceKm) })
+    }
+    const meters = Math.round(coupon.distanceKm * 1000)
+    return t("distanceAwayMeters", { distance: integerFormatter.format(meters) })
+  })()
 
   return (
     <>
@@ -102,6 +120,31 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
             <p className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
               by {coupon.business.name}
             </p>
+          )}
+
+          {(locationText || distanceLabel) && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                {t("locationLabel")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
+                    <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 1118 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span>{locationText ?? t("locationUnknown")}</span>
+                </div>
+                {distanceLabel && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 shadow-sm dark:bg-green-900/20 dark:text-green-300">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
+                      <path d="M12 20h.01M21 12a9 9 0 11-9-9" />
+                    </svg>
+                    <span>{distanceLabel}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           <p className="mb-6 line-clamp-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">

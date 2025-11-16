@@ -6,6 +6,25 @@ import bcrypt from "bcryptjs"
 import { Role } from "@prisma/client"
 import type { Adapter } from "next-auth/adapters"
 
+const userProfileSelection = {
+  role: true,
+  membershipExpiry: true,
+  name: true,
+  address: true,
+  birthDate: true,
+  phone: true,
+  about: true,
+  businessDescription: true,
+  businessCategories: true,
+  businessLocation: true,
+  businessWebsite: true,
+  businessInstagram: true,
+  businessFacebook: true,
+  businessTikTok: true,
+  businessLatitude: true,
+  businessLongitude: true,
+} as const
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   session: {
@@ -54,41 +73,68 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
-      // On sign in, store user data in token
-      if (user && user.id) {
-        token.id = user.id
-        token.role = (user as any).role
-        
-        // Fetch membership expiry on login
+    async jwt({ token, user, trigger, session }) {
+      const hydrateTokenFromDb = async (userId: string) => {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { membershipExpiry: true },
+          where: { id: userId },
+          select: userProfileSelection,
         })
-        
-        token.membershipExpiry = dbUser?.membershipExpiry?.toISOString() || null
-      }
-      
-      // Only refetch on explicit update trigger (not on every request)
-      if (trigger === "update" && token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { role: true, membershipExpiry: true },
-        })
-        
+
         if (dbUser) {
           token.role = dbUser.role
-          token.membershipExpiry = dbUser.membershipExpiry?.toISOString() || null
+          token.membershipExpiry = dbUser.membershipExpiry?.toISOString() ?? null
+          token.name = dbUser.name
+          token.address = dbUser.address ?? null
+          token.birthDate = dbUser.birthDate?.toISOString() ?? null
+          token.phone = dbUser.phone ?? null
+          token.about = dbUser.about ?? null
+          token.businessDescription = dbUser.businessDescription ?? null
+          token.businessCategories = dbUser.businessCategories ?? []
+          token.businessLocation = dbUser.businessLocation ?? null
+          token.businessWebsite = dbUser.businessWebsite ?? null
+          token.businessInstagram = dbUser.businessInstagram ?? null
+          token.businessFacebook = dbUser.businessFacebook ?? null
+          token.businessTikTok = dbUser.businessTikTok ?? null
+          token.businessLatitude = dbUser.businessLatitude ?? null
+          token.businessLongitude = dbUser.businessLongitude ?? null
         }
       }
-      
+
+      if (user && user.id) {
+        token.id = user.id
+        token.email = user.email
+        await hydrateTokenFromDb(user.id)
+      }
+
+      if (trigger === "update" && token.id) {
+        // When session is explicitly updated, prefer provided values to avoid extra query
+        if (session?.name) {
+          token.name = session.name
+        }
+        await hydrateTokenFromDb(token.id as string)
+      }
+
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as Role
-        session.user.membershipExpiry = token.membershipExpiry as string | null
+        session.user.membershipExpiry = (token.membershipExpiry as string | null) ?? null
+        session.user.name = (token.name as string) ?? session.user.name
+        session.user.address = (token.address as string | null) ?? null
+        session.user.birthDate = (token.birthDate as string | null) ?? null
+        session.user.phone = (token.phone as string | null) ?? null
+        session.user.about = (token.about as string | null) ?? null
+        session.user.businessDescription = (token.businessDescription as string | null) ?? null
+        session.user.businessCategories = (token.businessCategories as string[]) ?? []
+        session.user.businessLocation = (token.businessLocation as string | null) ?? null
+        session.user.businessWebsite = (token.businessWebsite as string | null) ?? null
+        session.user.businessInstagram = (token.businessInstagram as string | null) ?? null
+        session.user.businessFacebook = (token.businessFacebook as string | null) ?? null
+        session.user.businessTikTok = (token.businessTikTok as string | null) ?? null
+        session.user.businessLatitude = (token.businessLatitude as number | null) ?? null
+        session.user.businessLongitude = (token.businessLongitude as number | null) ?? null
       }
       return session
     },
