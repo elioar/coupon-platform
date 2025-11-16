@@ -10,7 +10,7 @@ declare module "next-auth" {
       role: Role
       membershipExpiry: string | null
       address?: string | null
-      birthDate?: string | null
+      birthDate?: string | Date | null
       phone?: string | null
       about?: string | null
       businessDescription?: string | null
