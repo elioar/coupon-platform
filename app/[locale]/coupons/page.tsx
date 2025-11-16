@@ -299,12 +299,12 @@ export default function CouponsPage() {
                       scale: 0.98,
                     }}
                   >
-                    <CouponCard
-                      coupon={coupon}
-                      isMember={userIsMember}
-                      locale={locale}
-                      onDetailsClick={() => setSelectedCoupon(coupon)}
-                    />
+                  <CouponCard
+                    coupon={coupon}
+                    isMember={userIsMember}
+                    locale={locale}
+                    onDetailsClick={() => setSelectedCoupon(coupon)}
+                  />
                   </motion.div>
                 ))}
               </AnimatePresence>
