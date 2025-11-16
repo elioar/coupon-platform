@@ -152,18 +152,11 @@
     "price": "€10/year",
     "bestValue": "⭐ Best Value",
     "mostPopular": "MOST POPULAR",
-    "pricePerMonth": "Just €0.83 per month",
     "billedAnnually": "Billed annually",
-    "billedMonthly": "Billed monthly",
-    "savePercentage": "Save 30% vs monthly",
-    "monthly": "Monthly",
     "yearly": "Yearly",
     "year": "year",
-    "month": "month",
     "just": "Just",
     "perMonth": "per month",
-    "save": "Save",
-    "vsMonthly": "vs monthly",
     "benefits": {
       "title": "Membership Benefits",
       "unlimited": "Unlimited access to all coupon codes",
@@ -253,6 +246,36 @@
       "manageCoupons": "Manage Coupons"
     }
   },
+  "profile": {
+    "title": "Profile Settings",
+    "subtitle": "Keep your details up to date so we can personalize your experience.",
+    "personalInfo": "Personal Information",
+    "name": "Full Name",
+    "address": "Address",
+    "birthDate": "Birth Date",
+    "birthDateHelp": "We only use this to personalize your experience.",
+    "phone": "Phone Number",
+    "about": "About You",
+    "aboutPlaceholder": "Tell us about yourself, your interests or what you are looking for.",
+    "businessOnly": "Business accounts can share extra information below.",
+    "businessInfo": "Business Profile",
+    "businessDescription": "Business Description",
+    "businessCategories": "Business Categories",
+    "businessCategoriesHelp": "Separate each category with a comma (e.g. Fashion, Beauty).",
+    "businessCategoriesPlaceholder": "Retail, Fashion, Accessories",
+    "businessLocation": "Location",
+    "businessWebsite": "Website URL",
+    "businessInstagram": "Instagram URL",
+    "businessFacebook": "Facebook URL",
+    "businessTikTok": "TikTok URL",
+    "linkSocial": "Social Links",
+    "save": "Save Profile",
+    "updateHint": "Click save once you finish editing your details.",
+    "loading": "Loading your profile...",
+    "success": "Profile updated successfully!",
+    "error": "We couldn't save your changes. Please try again.",
+    "noSession": "You must be signed in to view your profile."
+  },
   "couponForm": {
     "title": "Coupon Title",
     "description": "Description",
@@ -279,4 +302,3 @@
     "other": "Other"
   }
 }
-

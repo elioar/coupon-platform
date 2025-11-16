@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
-import { useParams } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Navigation from "@/components/Navigation"
 import CouponCard from "@/components/CouponCard"
@@ -44,17 +44,89 @@ export default function CouponsPage() {
   const tCommon = useTranslations("common")
   const params = useParams()
   const locale = params.locale as string
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const getInitialPage = () => {
+    const pageParam = searchParams.get("page")
+    const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
+    return Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+  }
 
   const [allCoupons, setAllCoupons] = useState<Coupon[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => searchParams.get("category"))
+  const [searchQuery, setSearchQuery] = useState<string>(() => searchParams.get("q") ?? "")
   const [loading, setLoading] = useState(true)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(getInitialPage)
   const itemsPerPage = 9
 
   const userIsMember = session?.user ? isMember(session.user) : false
+
+  const updateUrlParams = (updates: { category?: string | null; q?: string; page?: number }) => {
+    const paramsCopy = new URLSearchParams(searchParams.toString())
+
+    if ("category" in updates) {
+      const categoryValue = updates.category
+      if (categoryValue) {
+        paramsCopy.set("category", categoryValue)
+      } else {
+        paramsCopy.delete("category")
+      }
+    }
+
+    if ("q" in updates) {
+      const queryValue = updates.q ?? ""
+      if (queryValue.length > 0) {
+        paramsCopy.set("q", queryValue)
+      } else {
+        paramsCopy.delete("q")
+      }
+    }
+
+    if ("page" in updates) {
+      const pageValue = updates.page ?? 1
+      if (pageValue > 1) {
+        paramsCopy.set("page", pageValue.toString())
+      } else {
+        paramsCopy.delete("page")
+      }
+    }
+
+    const queryString = paramsCopy.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category")
+    const queryParam = searchParams.get("q") ?? ""
+    const pageParam = searchParams.get("page")
+    const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
+    const normalizedPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+
+    setSelectedCategory(categoryParam ?? null)
+    setSearchQuery(queryParam)
+    setCurrentPage(normalizedPage)
+  }, [searchParams])
+
+  const handleCategoryChange = (categoryId: string | null) => {
+    setSelectedCategory(categoryId)
+    setCurrentPage(1)
+    updateUrlParams({ category: categoryId, page: 1 })
+  }
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query)
+    setCurrentPage(1)
+    updateUrlParams({ q: query, page: 1 })
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    updateUrlParams({ page })
+  }
 
   // Filter coupons based on search query and category
   const filteredCoupons = allCoupons.filter((coupon) => {
@@ -85,11 +157,6 @@ export default function CouponsPage() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedCoupons = filteredCoupons.slice(startIndex, endIndex)
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [selectedCategory, searchQuery])
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -169,9 +236,9 @@ export default function CouponsPage() {
           <CategoryFilter
             categories={categories}
             selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
+            onSelectCategory={handleCategoryChange}
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={handleSearchChange}
             locale={locale}
           />
         </motion.div>
@@ -323,7 +390,7 @@ export default function CouponsPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
               className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all hover:bg-zinc-50 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900"
             >
@@ -352,7 +419,7 @@ export default function CouponsPage() {
                     key={pageNum}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setCurrentPage(pageNum)}
+                    onClick={() => handlePageChange(pageNum)}
                     className={`h-10 w-10 rounded-lg border font-semibold transition-all ${
                       isActive
                         ? "border-green-600 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg"
@@ -368,7 +435,7 @@ export default function CouponsPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all hover:bg-zinc-50 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900"
             >
