@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate && next build",
+    "build": "npm run prisma:generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "npx prisma generate",
+    "postinstall": "npm run prisma:generate",
+    "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
