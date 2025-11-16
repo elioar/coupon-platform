@@ -8,6 +8,8 @@ export const stripe = process.env.STRIPE_SECRET_KEY
     })
   : null;
 
-export const MEMBERSHIP_PRICE = 1000; // €10.00 in cents
+export const MEMBERSHIP_PRICE_YEARLY = 1000; // €10.00 in cents
+export const MEMBERSHIP_PRICE_MONTHLY = 150; // €1.50 in cents
 export const MEMBERSHIP_DURATION_DAYS = 365; // 1 year
+export const MEMBERSHIP_DURATION_DAYS_MONTHLY = 30; // 1 month
 

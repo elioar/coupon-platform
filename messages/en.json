@@ -104,7 +104,17 @@
       "submit": "Sign In",
       "noAccount": "Don't have an account?",
       "registerLink": "Register here",
-      "error": "Invalid email or password"
+      "error": "Invalid email or password",
+      "welcomeTitle": "Welcome Back!",
+      "welcomeDescription": "Sign in to access exclusive deals and save on your favorite products.",
+      "feature1Title": "Exclusive Coupons",
+      "feature1Description": "Access member-only discounts",
+      "feature2Title": "Track Your Savings",
+      "feature2Description": "Monitor all your deals in one place",
+      "feature3Title": "Personalized Recommendations",
+      "feature3Description": "Get deals tailored to your interests",
+      "saveMoreBadge": "Save More Today!",
+      "forgotPassword": "Forgot password?"
     },
     "register": {
       "title": "Create Account",
@@ -119,13 +129,41 @@
       "hasAccount": "Already have an account?",
       "loginLink": "Sign in here",
       "success": "Account created successfully!",
-      "error": "Registration failed"
+      "error": "Registration failed",
+      "passwordWeak": "Weak",
+      "passwordMedium": "Medium",
+      "passwordStrong": "Strong",
+      "passwordMoreChars": "more characters",
+      "strongPasswordRequired": "Strong required",
+      "passwordMustBeStrong": "Password must be strong. Use at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters.",
+      "passwordMinLength": "Password must be at least 8 characters long.",
+      "passwordRequirement": "Password must be strong to continue. Use uppercase, lowercase, numbers, and special characters.",
+      "passwordCheckLength": "At least 8 characters",
+      "passwordCheckLowercase": "One lowercase letter (a-z)",
+      "passwordCheckUppercase": "One uppercase letter (A-Z)",
+      "passwordCheckNumber": "One number (0-9)",
+      "passwordCheckSpecial": "One special character (!@#$%^&*)",
+      "passwordReady": "Ready to submit!"
     }
   },
   "membership": {
     "title": "Become a Member",
     "subtitle": "Unlock unlimited access to all coupon codes",
     "price": "€10/year",
+    "bestValue": "⭐ Best Value",
+    "mostPopular": "MOST POPULAR",
+    "pricePerMonth": "Just €0.83 per month",
+    "billedAnnually": "Billed annually",
+    "billedMonthly": "Billed monthly",
+    "savePercentage": "Save 30% vs monthly",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "year": "year",
+    "month": "month",
+    "just": "Just",
+    "perMonth": "per month",
+    "save": "Save",
+    "vsMonthly": "vs monthly",
     "benefits": {
       "title": "Membership Benefits",
       "unlimited": "Unlimited access to all coupon codes",
@@ -133,19 +171,52 @@
       "early": "Early access to new coupons",
       "support": "Priority customer support"
     },
+    "features": {
+      "saveMoney": {
+        "title": "Save More Money",
+        "description": "Access exclusive discounts that can save you hundreds of euros per year"
+      },
+      "instantAccess": {
+        "title": "Instant Access",
+        "description": "Get immediate access to all premium coupon codes after subscription"
+      },
+      "secure": {
+        "title": "100% Secure",
+        "description": "Your payment is processed securely through Stripe with industry-standard encryption"
+      }
+    },
+    "trust": {
+      "securePayment": "Secure payment via Stripe",
+      "cancelAnytime": "Cancel anytime"
+    },
     "cta": "Subscribe Now",
     "active": "Active Member",
     "expires": "Membership expires on",
     "renew": "Renew Membership",
-    "notMember": "You are not a member yet"
+    "notMember": "You are not a member yet",
+    "paymentCanceled": "Payment was canceled. You can try again anytime.",
+    "thankYou": "Thank you for subscribing."
   },
   "coupons": {
     "title": "Available Coupons",
+    "subtitle": "Discover amazing discounts and save big on your favorite brands",
+    "exclusiveDeal": "exclusive deal",
+    "exclusiveDeals": "exclusive deals",
+    "waitingForYou": "waiting for you!",
+    "availableCoupons": "Available Coupons",
     "noCoupons": "No coupons available",
+    "noCouponsFound": "No coupons found",
+    "tryDifferentSearch": "Try a different search or filter",
+    "checkBackSoon": "Check back soon for new deals!",
     "filterByCategory": "Filter by category",
+    "page": "Page",
+    "of": "of",
+    "previous": "Previous",
+    "next": "Next",
     "discount": "OFF",
     "expires": "Expires",
     "getCode": "Get Code",
+    "getCoupon": "Get Coupon",
     "becomeMember": "Become a Member to View Code",
     "copiedCode": "Code copied!",
     "copyCode": "Copy Code",

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl"
 import { format } from "date-fns"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 
 interface Coupon {
@@ -40,6 +40,24 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
 
+  // Prevent body scroll when modal is open and handle escape key
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    
+    document.addEventListener('keydown', handleEscape)
+    
+    return () => {
+      document.body.style.overflow = 'unset'
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [onClose])
+
   const copyCode = () => {
     if (isMember) {
       navigator.clipboard.writeText(coupon.code)
@@ -50,17 +68,18 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <div
-        className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
+        className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 rounded-full bg-white/90 p-2 text-zinc-700 transition hover:bg-white dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="absolute right-4 top-4 z-10 rounded-full bg-white/90 backdrop-blur-sm p-2 text-zinc-600 shadow-lg transition hover:bg-white hover:scale-110 hover:text-zinc-900 dark:bg-zinc-800/90 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          aria-label="Close modal"
         >
           <svg
             className="h-5 w-5"
@@ -76,16 +95,32 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
         </button>
 
         {/* Image */}
-        {coupon.imagePath && (
-          <div className="relative aspect-video w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+        {coupon.imagePath ? (
+          <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20">
             <Image
               src={coupon.imagePath}
               alt={coupon.title}
               fill
               className="object-cover"
+              priority
             />
             {/* Discount Badge */}
-            <div className="absolute right-4 top-4 rounded-lg bg-violet-600 px-4 py-2 text-lg font-bold text-white shadow-lg">
+            <div className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 px-3 py-1.5 text-sm font-bold text-white shadow-lg">
+              {coupon.discountPercentage}% {t("discount")}
+            </div>
+          </div>
+        ) : (
+          <div className="relative h-32 w-full overflow-hidden bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-teal-500/10 dark:from-green-900/20 dark:via-emerald-900/20 dark:to-teal-900/20">
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <div className="text-5xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                  {coupon.discountPercentage}%
+                </div>
+                <div className="mt-1 text-xs font-semibold text-green-600 dark:text-green-400">{t("discount")}</div>
+              </div>
+            </div>
+            {/* Discount Badge */}
+            <div className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 px-3 py-1.5 text-sm font-bold text-white shadow-lg">
               {coupon.discountPercentage}% {t("discount")}
             </div>
           </div>
@@ -94,53 +129,54 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
         {/* Content */}
         <div className="p-6">
           <div className="mb-4 flex items-center justify-between">
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
               {categoryName}
             </span>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {t("expires")}: {format(new Date(coupon.expirationDate), "MMM dd, yyyy")}
-            </span>
+            <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{format(new Date(coupon.expirationDate), "MMM dd, yyyy")}</span>
+            </div>
           </div>
 
-          <h2 className="mb-2 text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+          <h2 className="mb-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
             {coupon.title}
           </h2>
 
           {coupon.business && (
-            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-              By {coupon.business.name}
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              by {coupon.business.name}
             </p>
           )}
 
-          <p className="mb-6 text-zinc-700 dark:text-zinc-300">
+          <p className="mb-6 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
             {coupon.description}
           </p>
 
           {/* Code Section */}
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/50">
+            <h3 className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               {t("code")}
             </h3>
 
             {isMember ? (
-              <>
-                <div className="mb-4 flex items-center justify-between rounded-lg border-2 border-dashed border-violet-300 bg-white p-4 dark:border-violet-700 dark:bg-zinc-900">
-                  <code className="text-2xl font-bold text-violet-700 dark:text-violet-300">
-                    {coupon.code}
-                  </code>
-                  <button
-                    onClick={copyCode}
-                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700"
-                  >
-                    {copied ? t("copiedCode") : t("copyCode")}
-                  </button>
-                </div>
-              </>
+              <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-green-300 bg-white p-4 dark:border-green-700 dark:bg-zinc-900">
+                <code className="text-xl font-bold tracking-wider text-green-700 dark:text-green-300">
+                  {coupon.code}
+                </code>
+                <button
+                  onClick={copyCode}
+                  className="shrink-0 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95"
+                >
+                  {copied ? t("copiedCode") : t("copyCode")}
+                </button>
+              </div>
             ) : (
               <div className="text-center">
                 <div className="mb-4 rounded-lg border-2 border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
                   <div className="blur-sm">
-                    <code className="text-2xl font-bold text-zinc-400">XXXXXXXX</code>
+                    <code className="text-xl font-bold tracking-wider text-zinc-400">XXXXXXXX</code>
                   </div>
                 </div>
                 <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
@@ -148,7 +184,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
                 </p>
                 <Link
                   href={`/${locale}/membership`}
-                  className="inline-block rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white transition hover:bg-violet-700"
+                  className="inline-block rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 hover:scale-105"
                 >
                   {tMembership("cta")}
                 </Link>
