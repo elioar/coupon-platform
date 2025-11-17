@@ -363,15 +363,6 @@ export default function CouponsPage() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedCoupons = sortedCoupons.slice(startIndex, endIndex)
-  const dealsMessage =
-    sortedCoupons.length > 0
-      ? `${sortedCoupons.length} ${
-          sortedCoupons.length === 1 ? t("exclusiveDeal") : t("exclusiveDeals")
-        } ${t("waitingForYou")}${
-          totalPages > 1 ? ` (${t("page")} ${currentPage} ${t("of")} ${totalPages})` : ""
-        }`
-      : ""
-
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -439,20 +430,35 @@ export default function CouponsPage() {
             locationLoading={locationLoading}
             geolocationSupported={geolocationSupported}
             onNearMeClick={handleNearMeClick}
-            locationDescription={locationDescription}
-            locationError={locationError}
-            hasDistanceCoupons={hasDistanceCoupons}
           />
         </motion.div>
 
-        {!loading && dealsMessage && (
+        {!loading && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.25 }}
-            className="mb-6 rounded-2xl border border-green-100 bg-white/90 px-6 py-4 text-sm font-semibold text-green-700 shadow-sm dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100"
+            transition={{ duration: 0.35, delay: 0.2 }}
+            className="mb-6 rounded-2xl border border-zinc-200/60 bg-white/90 px-4 py-3 text-sm font-semibold text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-100"
           >
-            {dealsMessage}
+            {sortedCoupons.length > 0 ? (
+              <span className="flex items-center justify-between gap-4">
+                <span className="text-base font-bold text-green-600 dark:text-green-400">
+                  {sortedCoupons.length.toLocaleString(locale)}
+                </span>
+                <span className="flex-1 text-left text-xs uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                  {sortedCoupons.length === 1 ? t("exclusiveDeal") : t("exclusiveDeals")}
+                </span>
+                {totalPages > 1 && (
+                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                    {t("page")} {currentPage}/{totalPages}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                {t("noCouponsFound")}
+              </span>
+            )}
           </motion.div>
         )}
 

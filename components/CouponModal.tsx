@@ -1,7 +1,6 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import { format } from "date-fns"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import Link from "next/link"
@@ -31,6 +30,18 @@ interface CouponModalProps {
   isMember: boolean
   locale: string
   onClose: () => void
+}
+
+const formatExpirationDate = (dateString: string, locale: string) => {
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date)
 }
 
 export default function CouponModal({ coupon, isMember, locale, onClose }: CouponModalProps) {
@@ -136,7 +147,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{format(new Date(coupon.expirationDate), "MMM dd, yyyy")}</span>
+              <span>{formatExpirationDate(coupon.expirationDate, locale)}</span>
             </div>
           </div>
 
