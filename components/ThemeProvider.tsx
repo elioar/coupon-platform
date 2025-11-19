@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useCallback, useState } from "react"
 
 type Theme = "dark" | "light" | "system"
 
@@ -13,7 +13,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     // Initialize from localStorage if available
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("theme") as Theme | null
@@ -34,9 +34,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     return "light"
   })
-  
-  // Apply theme immediately when it changes or on mount
-  useEffect(() => {
+
+  // Function to apply theme to DOM - use useCallback to prevent recreation
+  const applyTheme = useCallback((newTheme: Theme) => {
     if (typeof window === "undefined") return
 
     const root = window.document.documentElement
@@ -46,15 +46,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     let resolved: "dark" | "light"
 
-    if (theme === "system") {
+    if (newTheme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light"
       resolved = systemTheme
       root.classList.add(systemTheme)
     } else {
-      resolved = theme
-      root.classList.add(theme)
+      resolved = newTheme
+      root.classList.add(newTheme)
     }
 
     // Force a reflow to ensure the class is applied
@@ -64,11 +64,55 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     
     // Save to localStorage
     try {
-      localStorage.setItem("theme", theme)
+      localStorage.setItem("theme", newTheme)
     } catch (e) {
       // Ignore localStorage errors
     }
-  }, [theme])
+  }, [])
+
+  // Wrapper for setTheme that applies theme immediately
+  const setTheme = useCallback((newTheme: Theme) => {
+    // Update state first
+    setThemeState(newTheme)
+    
+    // Apply theme immediately for instant feedback (synchronous)
+    if (typeof window !== "undefined") {
+      const root = window.document.documentElement
+      
+      // Remove both classes first
+      root.classList.remove("light", "dark")
+      
+      let resolved: "dark" | "light"
+      if (newTheme === "system") {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        resolved = systemTheme
+        root.classList.add(systemTheme)
+      } else {
+        resolved = newTheme
+        root.classList.add(newTheme)
+      }
+      
+      // Force a reflow to ensure the class is applied before any repaint
+      void root.offsetHeight
+      
+      // Update resolved theme state
+      setResolvedTheme(resolved)
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem("theme", newTheme)
+      } catch (e) {
+        // Ignore localStorage errors (e.g., in private browsing)
+      }
+    }
+  }, [])
+  
+  // Apply theme on mount and when theme changes
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme, applyTheme])
 
   const [mounted, setMounted] = useState(false)
 
@@ -76,17 +120,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true)
   }, [])
 
-  // Listen for system theme changes
+  // Listen for system theme changes ONLY when theme is set to "system"
   useEffect(() => {
     if (!mounted || theme !== "system") return
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
     const handleChange = () => {
-      const root = window.document.documentElement
-      root.classList.remove("light", "dark")
-      const systemTheme = mediaQuery.matches ? "dark" : "light"
-      root.classList.add(systemTheme)
-      setResolvedTheme(systemTheme)
+      // Only update if theme is still "system" (user hasn't changed it)
+      if (theme === "system") {
+        const root = window.document.documentElement
+        root.classList.remove("light", "dark")
+        const systemTheme = mediaQuery.matches ? "dark" : "light"
+        root.classList.add(systemTheme)
+        setResolvedTheme(systemTheme)
+      }
     }
 
     mediaQuery.addEventListener("change", handleChange)

@@ -4,6 +4,8 @@ import { useTranslations } from "next-intl"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
+import { trackCouponEvent } from "@/lib/analytics"
 
 interface Coupon {
   id: string
@@ -47,9 +49,15 @@ const formatExpirationDate = (dateString: string, locale: string) => {
 export default function CouponModal({ coupon, isMember, locale, onClose }: CouponModalProps) {
   const t = useTranslations("coupons")
   const tMembership = useTranslations("membership")
+  const { data: session } = useSession()
   const [copied, setCopied] = useState(false)
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
+
+  // Track view when modal opens
+  useEffect(() => {
+    trackCouponEvent(coupon.id, "VIEW", session?.user?.id)
+  }, [coupon.id, session?.user?.id])
 
   // Prevent body scroll when modal is open and handle escape key
   useEffect(() => {
@@ -73,6 +81,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
     if (isMember) {
       navigator.clipboard.writeText(coupon.code)
       setCopied(true)
+      trackCouponEvent(coupon.id, "CLICK", session?.user?.id)
       setTimeout(() => setCopied(false), 2000)
     }
   }

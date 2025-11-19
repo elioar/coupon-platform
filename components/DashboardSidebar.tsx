@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signOut } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "@/components/ThemeProvider"
 
 interface MenuItem {
@@ -36,8 +36,10 @@ export default function DashboardSidebar({
   const tNav = useTranslations("nav")
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
   
   // Use external state if provided, otherwise use internal state
   const isMobileMenuOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
@@ -49,14 +51,14 @@ export default function DashboardSidebar({
   }
 
   const toggleTheme = () => {
-    if (resolvedTheme === "dark") {
-      setTheme("light")
-    } else {
-      setTheme("dark")
-    }
+    // Always set explicit theme (never "system")
+    // Use resolvedTheme to determine current appearance, then toggle to opposite
+    const newTheme = resolvedTheme === "dark" ? "light" : "dark"
+    setTheme(newTheme)
   }
 
   const handleLogout = async () => {
+    setShowLogoutModal(false)
     await signOut({ redirect: false })
     router.push(`/${locale}`)
   }
@@ -232,9 +234,15 @@ export default function DashboardSidebar({
 
   const menuItems = getMenuItems()
 
-  const isActive = (href?: string) => {
-    if (!href) return false
-    return pathname === href || pathname.startsWith(href)
+  // Get current section from URL query parameter
+  const currentSection = searchParams.get("section") || "overview"
+
+  const isActive = (itemId: string) => {
+    // For overview, also check if no section is specified (defaults to overview)
+    if (itemId === "overview" && !searchParams.get("section")) {
+      return true
+    }
+    return currentSection === itemId
   }
 
   const closeMobileMenu = () => {
@@ -243,17 +251,37 @@ export default function DashboardSidebar({
     }
   }
 
+  // Handle Escape key to close logout modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showLogoutModal) {
+        setShowLogoutModal(false)
+      }
+    }
+
+    if (showLogoutModal) {
+      document.addEventListener('keydown', handleEscape)
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'unset'
+    }
+  }, [showLogoutModal])
+
   return (
     <>
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-72 transform border-r border-zinc-800 bg-zinc-900 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-40 h-screen w-72 transform border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out dark:border-zinc-800 dark:bg-zinc-900 lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo/Brand Header */}
-          <div className="flex h-16 items-center gap-2 border-b border-zinc-800 px-6">
+          <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6 dark:border-zinc-800">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
               <svg
                 className="h-6 w-6 text-white"
@@ -268,8 +296,8 @@ export default function DashboardSidebar({
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">CouponHub</h2>
-              <p className="text-xs text-zinc-400">Dashboard</p>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">CouponHub</h2>
+              <p className="text-xs text-gray-500 dark:text-zinc-400">Dashboard</p>
             </div>
           </div>
 
@@ -277,7 +305,7 @@ export default function DashboardSidebar({
           <nav className="flex-1 overflow-y-auto p-4">
             <ul className="space-y-1">
               {menuItems.map((item) => {
-                const isActiveLink = isActive(item.href)
+                const isActiveLink = isActive(item.id)
                 
                 if (item.onClick) {
                   return (
@@ -285,9 +313,13 @@ export default function DashboardSidebar({
                       <button
                         onClick={() => {
                           closeMobileMenu()
-                          item.onClick?.()
+                          if (item.id === "logout") {
+                            setShowLogoutModal(true)
+                          } else {
+                            item.onClick?.()
+                          }
                         }}
-                        className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+                        className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                       >
                         {item.icon}
                         <span>{item.label}</span>
@@ -303,11 +335,11 @@ export default function DashboardSidebar({
                       onClick={closeMobileMenu}
                       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
                         isActiveLink
-                          ? "bg-violet-600 text-white shadow-lg shadow-violet-500/50"
-                          : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                          ? "bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-lg shadow-violet-500/50 dark:from-violet-500 dark:to-violet-600"
+                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                       }`}
                     >
-                      {item.icon}
+                      <span className={isActiveLink ? "opacity-100" : "opacity-70"}>{item.icon}</span>
                       <span>{item.label}</span>
                     </Link>
                   </li>
@@ -316,10 +348,10 @@ export default function DashboardSidebar({
             </ul>
 
             {/* Language & Theme Switcher */}
-            <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
+            <div className="mt-4 space-y-2 border-t border-gray-200 pt-4 dark:border-zinc-800">
               {/* Language Switcher */}
               <div>
-                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                   {tNav("language")}
                 </p>
                 <div className="grid grid-cols-2 gap-2 px-4">
@@ -331,7 +363,7 @@ export default function DashboardSidebar({
                     className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
                       locale === "en"
                         ? "bg-violet-600 text-white"
-                        : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     }`}
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -348,7 +380,7 @@ export default function DashboardSidebar({
                     className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
                       locale === "el"
                         ? "bg-violet-600 text-white"
-                        : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     }`}
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -362,12 +394,12 @@ export default function DashboardSidebar({
 
               {/* Theme Toggle */}
               <div>
-                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                   {tNav("theme")}
                 </p>
                 <button
                   onClick={toggleTheme}
-                  className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+                  className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                 >
                   {resolvedTheme === "dark" ? (
                     <>
@@ -390,16 +422,16 @@ export default function DashboardSidebar({
           </nav>
 
           {/* Footer - User Info */}
-          <div className="border-t border-zinc-800 p-4">
+          <div className="border-t border-gray-200 p-4 dark:border-zinc-800">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-sm font-bold text-white">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 overflow-hidden">
-                <p className="truncate text-sm font-semibold text-white">
+                <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                   {userName}
                 </p>
-                <p className="truncate text-xs text-zinc-400">{userEmail}</p>
+                <p className="truncate text-xs text-gray-500 dark:text-zinc-400">{userEmail}</p>
               </div>
             </div>
           </div>
@@ -413,6 +445,69 @@ export default function DashboardSidebar({
           className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden"
           aria-hidden="true"
         />
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLogoutModal(false)
+            }
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity dark:bg-black/80"></div>
+          
+          {/* Modal */}
+          <div 
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white shadow-2xl dark:bg-zinc-900 overflow-hidden"
+            style={{ animation: 'scaleIn 0.2s ease-out' }}
+          >
+            {/* Header */}
+            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                  <svg className="h-6 w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Are you sure?</h3>
+                  <p className="mt-0.5 text-sm text-gray-500 dark:text-zinc-400">Choose an action to continue</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-6">
+              <p className="text-sm text-gray-600 dark:text-zinc-400 leading-relaxed">
+                Are you sure you want to log out? You'll need to sign in again to access your account.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-3 border-t border-gray-200/50 bg-gray-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <button
+                onClick={handleLogout}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-all duration-200 hover:from-red-700 hover:to-red-800 hover:shadow-xl hover:shadow-red-500/30 active:scale-[0.98] dark:from-red-500 dark:to-red-600 dark:hover:from-red-600 dark:hover:to-red-700 touch-manipulation"
+              >
+                <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
+              </button>
+
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="w-full rounded-2xl border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 touch-manipulation"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

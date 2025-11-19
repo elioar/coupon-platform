@@ -85,9 +85,27 @@ model Coupon {
   // Relations
   business            User          @relation("BusinessCoupons", fields: [businessId], references: [id], onDelete: Cascade)
   category            Category      @relation(fields: [categoryId], references: [id])
+  analytics           CouponAnalytics[]
   
   @@index([businessId])
   @@index([categoryId])
   @@index([status])
   @@index([expirationDate])
+}
+
+model CouponAnalytics {
+  id          String   @id @default(cuid())
+  couponId    String
+  eventType   String   // 'VIEW', 'CLICK', 'REDEMPTION'
+  userId      String?  // Optional - track which user (if authenticated)
+  ipAddress   String?  // Optional - for anonymous tracking
+  userAgent   String?  // Optional - browser/device info
+  createdAt   DateTime @default(now())
+  
+  coupon      Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  
+  @@index([couponId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([userId])
 }
