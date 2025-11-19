@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
         createdAt: { gte: start, lte: end }
       },
       select: {
+        couponId: true,
         eventType: true,
         createdAt: true
       }
