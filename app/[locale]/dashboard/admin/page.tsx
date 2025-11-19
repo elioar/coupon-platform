@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
-import Navigation from "@/components/Navigation"
+import { useParams, useSearchParams } from "next/navigation"
+import DashboardSidebar from "@/components/DashboardSidebar"
+import DashboardHeader from "@/components/DashboardHeader"
 import Button from "@/components/Button"
-import { format } from "date-fns"
+// Removed date-fns dependency
 
 interface Coupon {
   id: string
@@ -58,12 +60,19 @@ export default function AdminDashboard() {
   const { data: session } = useSession()
   const t = useTranslations("dashboard.admin")
   const tCommon = useTranslations("common")
+  const tProfile = useTranslations("profile")
+  const params = useParams()
+  const searchParams = useSearchParams()
+  const locale = params.locale as string
+  const section = searchParams.get("section") || "overview"
 
   const [pendingCoupons, setPendingCoupons] = useState<Coupon[]>([])
+  const [allCoupons, setAllCoupons] = useState<Coupon[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingCoupons, setLoadingCoupons] = useState(false)
   const [activeTab, setActiveTab] = useState<"coupons" | "users" | "categories">("coupons")
   const [processingCoupon, setProcessingCoupon] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -78,6 +87,36 @@ export default function AdminDashboard() {
   const [submittingCategory, setSubmittingCategory] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
+  
+  // User profile modal state
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [selectedUserProfile, setSelectedUserProfile] = useState<any>(null)
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  
+  // Coupon management state
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
+  const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
+  const [viewingCouponId, setViewingCouponId] = useState<string | null>(null)
+  const [couponForm, setCouponForm] = useState({
+    title: "",
+    description: "",
+    code: "",
+    categoryId: "",
+    discountPercentage: 0,
+    expirationDate: "",
+    status: "PENDING" as "PENDING" | "APPROVED" | "REJECTED"
+  })
+  const [submittingCoupon, setSubmittingCoupon] = useState(false)
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("ALL")
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
+  const [businessFilter, setBusinessFilter] = useState<string>("ALL")
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,6 +146,67 @@ export default function AdminDashboard() {
 
     fetchData()
   }, [])
+
+  // Fetch all coupons when coupons section is active
+  useEffect(() => {
+    if (section === "coupons") {
+      fetchAllCoupons()
+    }
+  }, [section])
+
+  const fetchAllCoupons = async () => {
+    setLoadingCoupons(true)
+    try {
+      // Fetch coupons with all statuses for admin
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+        fetch('/api/coupons?status=PENDING'),
+        fetch('/api/coupons?status=APPROVED'),
+        fetch('/api/coupons?status=REJECTED'),
+      ])
+      
+      const pendingData = await pendingRes.json()
+      const approvedData = await approvedRes.json()
+      const rejectedData = await rejectedRes.json()
+      
+      // Combine all coupons
+      const allCouponsData = [
+        ...(pendingData.coupons || []),
+        ...(approvedData.coupons || []),
+        ...(rejectedData.coupons || [])
+      ]
+      
+      setAllCoupons(allCouponsData)
+    } catch (error) {
+      console.error("Error fetching all coupons:", error)
+      setMessage({ type: 'error', text: 'Failed to load coupons' })
+    } finally {
+      setLoadingCoupons(false)
+    }
+  }
+
+  const fetchUserProfile = async (userId: string) => {
+    setLoadingProfile(true)
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to fetch user profile: ${response.status}`)
+      }
+      const data = await response.json()
+      setSelectedUserProfile(data.user)
+    } catch (error) {
+      console.error("Error fetching user profile:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to load user profile"
+      setMessage({ type: "error", text: errorMessage })
+      // Close modal on error
+      setTimeout(() => {
+        setSelectedUserId(null)
+        setSelectedUserProfile(null)
+      }, 3000)
+    } finally {
+      setLoadingProfile(false)
+    }
+  }
 
   const handleApproval = async (couponId: string, status: "APPROVED" | "REJECTED") => {
     setProcessingCoupon(couponId)
@@ -298,20 +398,984 @@ export default function AdminDashboard() {
     setCategoryForm({ nameEn: "", nameEl: "", slug: "" })
   }
 
-  return (
-    <div className="min-h-screen bg-white dark:from-zinc-950 dark:via-zinc-950 dark:to-violet-950/20 dark:bg-gradient-to-br">
-      <Navigation />
+  const handleEditCoupon = (coupon: Coupon) => {
+    setEditingCouponId(coupon.id)
+    // Get category ID from coupon if available
+    const categoryId = (coupon.category as any)?.id || ""
+    setCouponForm({
+      title: coupon.title,
+      description: coupon.description,
+      code: coupon.code,
+      categoryId: categoryId,
+      discountPercentage: coupon.discountPercentage,
+      expirationDate: coupon.expirationDate ? new Date(coupon.expirationDate).toISOString().slice(0, 16) : "",
+      status: coupon.status as "PENDING" | "APPROVED" | "REJECTED"
+    })
+  }
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">
-            {t("title")}
-          </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Welcome back, {session?.user.name}!
-          </p>
-        </div>
+  const handleUpdateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCouponId) return
+
+    setSubmittingCoupon(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch(`/api/coupons/${editingCouponId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...couponForm,
+          expirationDate: couponForm.expirationDate ? new Date(couponForm.expirationDate).toISOString() : undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setAllCoupons(allCoupons.map(c => c.id === editingCouponId ? data.coupon : c))
+        setCouponForm({
+          title: "",
+          description: "",
+          code: "",
+          categoryId: "",
+          discountPercentage: 0,
+          expirationDate: "",
+          status: "PENDING"
+        })
+        setEditingCouponId(null)
+        setMessage({ type: 'success', text: t("couponUpdated") })
+        // Refresh stats
+        const statsRes = await fetch('/api/admin/stats')
+        const statsData = await statsRes.json()
+        setStats(statsData.stats || null)
+        // Refresh coupons list
+        fetchAllCoupons()
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to update coupon' })
+      }
+    } catch (error) {
+      console.error("Error updating coupon:", error)
+      setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
+    } finally {
+      setSubmittingCoupon(false)
+      setTimeout(() => setMessage(null), 5000)
+    }
+  }
+
+  const handleDeleteCoupon = async (couponId: string) => {
+    setDeletingCouponId(couponId)
+    setMessage(null)
+
+    try {
+      const response = await fetch(`/api/coupons/${couponId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setAllCoupons(allCoupons.filter(c => c.id !== couponId))
+        setMessage({ type: 'success', text: t("couponDeleted") })
+        // Refresh stats
+        const statsRes = await fetch('/api/admin/stats')
+        const statsData = await statsRes.json()
+        setStats(statsData.stats || null)
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to delete coupon' })
+      }
+    } catch (error) {
+      console.error("Error deleting coupon:", error)
+      setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
+    } finally {
+      setDeletingCouponId(null)
+      setTimeout(() => setMessage(null), 5000)
+    }
+  }
+
+  const handleViewCoupon = async (couponId: string) => {
+    setViewingCouponId(couponId)
+    try {
+      const response = await fetch(`/api/coupons/${couponId}`)
+      const data = await response.json()
+      if (response.ok) {
+        // Coupon details will be shown in modal
+      }
+    } catch (error) {
+      console.error("Error fetching coupon:", error)
+    }
+  }
+
+  const cancelCouponEdit = () => {
+    setEditingCouponId(null)
+    setCouponForm({
+      title: "",
+      description: "",
+      code: "",
+      categoryId: "",
+      discountPercentage: 0,
+      expirationDate: "",
+      status: "PENDING"
+    })
+  }
+
+  // Get unique businesses from coupons
+  const uniqueBusinesses = Array.from(
+    new Map(allCoupons.map(c => [c.business?.id, c.business])).values()
+  ).filter(Boolean)
+
+  // Filter coupons based on search and filters
+  const filteredCoupons = allCoupons.filter((coupon) => {
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesSearch = 
+        coupon.title.toLowerCase().includes(query) ||
+        coupon.code.toLowerCase().includes(query) ||
+        coupon.description.toLowerCase().includes(query) ||
+        coupon.business?.name.toLowerCase().includes(query) ||
+        coupon.business?.email.toLowerCase().includes(query)
+      
+      if (!matchesSearch) return false
+    }
+
+    // Status filter
+    if (statusFilter !== "ALL" && coupon.status !== statusFilter) {
+      return false
+    }
+
+    // Category filter
+    if (categoryFilter !== "ALL") {
+      const couponCategoryId = (coupon.category as any)?.id
+      if (couponCategoryId !== categoryFilter) {
+        return false
+      }
+    }
+
+    // Business filter
+    if (businessFilter !== "ALL" && coupon.business?.id !== businessFilter) {
+      return false
+    }
+
+    return true
+  })
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCoupons.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCoupons = filteredCoupons.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, categoryFilter, businessFilter])
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  return (
+    <div className="flex min-h-screen overflow-x-hidden bg-zinc-50 dark:bg-zinc-950">
+      <DashboardSidebar
+        role="ADMIN"
+        locale={locale}
+        userName={session?.user.name || "Admin"}
+        userEmail={session?.user.email || ""}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+      />
+
+      <DashboardHeader
+        userName={session?.user.name || "Admin"}
+        userEmail={session?.user.email || ""}
+        role="ADMIN"
+        locale={locale}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      />
+
+      <main className="ml-0 flex-1 overflow-x-hidden pt-16 lg:ml-72">
+        <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 lg:px-8">
+          
+          {/* Users Section */}
+          {section === "users" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">{t("userManagement")}</h1>
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 sm:text-base">{t("manageAllUsers")}</p>
+              </div>
+
+              {/* Stats Cards */}
+              {stats && (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                    <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">{t("totalUsers")}</h3>
+                    <p className="mt-2 text-3xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-4xl">{stats.totalUsers}</p>
+                  </div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                    <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">{t("businesses")}</h3>
+                    <p className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-500 sm:text-4xl">{stats.totalBusinesses}</p>
+                  </div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                    <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">{t("activeMembers")}</h3>
+                    <p className="mt-2 text-3xl font-bold text-green-600 dark:text-green-500 sm:text-4xl">{stats.activeMembers}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Users Table */}
+              <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                    <thead className="bg-zinc-50/50 dark:bg-zinc-800/30">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">
+                          {t("name")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">
+                          {t("email")}
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">
+                          {t("role")}
+                        </th>
+                        <th className="hidden px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 md:table-cell">
+                          {t("membershipExpiry")}
+                        </th>
+                        <th className="hidden px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 lg:table-cell">
+                          {t("memberSince")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {users.map((user) => (
+                        <tr 
+                          key={user.id} 
+                          onClick={() => {
+                            setSelectedUserId(user.id)
+                            fetchUserProfile(user.id)
+                          }}
+                          className="cursor-pointer transition hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30"
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 sm:h-10 sm:w-10 sm:text-sm">
+                                {user.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">
+                                {user.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 sm:text-sm">
+                            <div className="max-w-[150px] truncate sm:max-w-none">{user.email}</div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold sm:px-3 sm:py-1 ${
+                              user.role === 'ADMIN' 
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                : user.role === 'BUSINESS'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 sm:text-sm md:table-cell">
+                            {user.membershipExpiry ? (
+                              <span className="flex items-center gap-1">
+                                <svg className="h-3 w-3 text-green-600 dark:text-green-400 sm:h-4 sm:w-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                {new Date(user.membershipExpiry).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-400">—</span>
+                            )}
+                          </td>
+                          <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 sm:text-sm lg:table-cell">
+                            {new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Coupons Section */}
+          {section === "coupons" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">{t("couponManagement")}</h1>
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 sm:text-base">{t("couponManagementDescription")}</p>
+              </div>
+
+              {/* Search and Filters */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="space-y-4">
+                  {/* Search Bar */}
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("search")}</label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg className="h-5 w-5 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t("searchPlaceholder")}
+                        className="w-full rounded-lg border border-zinc-300 bg-white pl-10 pr-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filters Row */}
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    {/* Status Filter */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("status")}</label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as "ALL" | "PENDING" | "APPROVED" | "REJECTED")}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="ALL">{t("allStatuses")}</option>
+                        <option value="PENDING">{t("pending")}</option>
+                        <option value="APPROVED">{t("approved")}</option>
+                        <option value="REJECTED">{t("reject")}</option>
+                      </select>
+                    </div>
+
+                    {/* Category Filter */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("category")}</label>
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="ALL">{t("allCategories")}</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {locale === "el" ? category.nameEl : category.nameEn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Business Filter */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("business")}</label>
+                      <select
+                        value={businessFilter}
+                        onChange={(e) => setBusinessFilter(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="ALL">{t("allBusinesses")}</option>
+                        {uniqueBusinesses.map((business) => (
+                          <option key={business?.id} value={business?.id}>
+                            {business?.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Results Count and Clear Filters */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {t("showingResults")} <span className="font-semibold text-zinc-900 dark:text-zinc-50">{startIndex + 1}</span>-<span className="font-semibold text-zinc-900 dark:text-zinc-50">{Math.min(endIndex, filteredCoupons.length)}</span> {t("of")} <span className="font-semibold text-zinc-900 dark:text-zinc-50">{filteredCoupons.length}</span> {t("coupons")}
+                    </p>
+                    {(searchQuery || statusFilter !== "ALL" || categoryFilter !== "ALL" || businessFilter !== "ALL") && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery("")
+                          setStatusFilter("ALL")
+                          setCategoryFilter("ALL")
+                          setBusinessFilter("ALL")
+                        }}
+                        className="text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                      >
+                        {t("clearFilters")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Success/Error Message */}
+              {message && (
+                <div className={`rounded-xl border p-4 ${
+                  message.type === 'success' 
+                    ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
+                    : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {message.type === 'success' ? (
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="font-medium">{message.text}</span>
+                  </div>
+                </div>
+              )}
+
+
+              {/* Coupons Table */}
+              {loadingCoupons ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600"></div>
+                    <p className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
+                  </div>
+                </div>
+              ) : allCoupons.length === 0 ? (
+                <div className="rounded-xl border border-zinc-200 bg-white p-16 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <svg className="h-8 w-8 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("noCouponsFound")}</h3>
+                  <p className="text-zinc-600 dark:text-zinc-400">{t("noCouponsYet")}</p>
+                </div>
+              ) : filteredCoupons.length === 0 ? (
+                <div className="rounded-xl border border-zinc-200 bg-white p-16 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <svg className="h-8 w-8 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("noCouponsMatch")}</h3>
+                  <p className="text-zinc-600 dark:text-zinc-400">{t("adjustFilters")}</p>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("")
+                      setStatusFilter("ALL")
+                      setCategoryFilter("ALL")
+                      setBusinessFilter("ALL")
+                    }}
+                    className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700"
+                  >
+                    {t("clearAllFilters")}
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                      <thead className="bg-zinc-50/50 dark:bg-zinc-800/30">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">{t("tableTitle")}</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">{t("tableBusiness")}</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">{t("tableCode")}</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">{t("tableDiscount")}</th>
+                          <th className="hidden px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 md:table-cell">{t("tableStatus")}</th>
+                          <th className="hidden px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 lg:table-cell">{t("tableExpires")}</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">{t("tableActions")}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {paginatedCoupons.map((coupon) => (
+                          <tr key={coupon.id} className="transition hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                            <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                              <div className="font-medium text-zinc-900 dark:text-zinc-100">{coupon.title}</div>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4">
+                              {coupon.business?.name || "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-zinc-900 dark:text-zinc-100 sm:px-6 sm:py-4">
+                              {coupon.code}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 sm:px-6 sm:py-4">
+                              <span className="font-semibold text-violet-600 dark:text-violet-400">{coupon.discountPercentage}%</span>
+                            </td>
+                            <td className="hidden whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4 md:table-cell">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                coupon.status === 'APPROVED'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                  : coupon.status === 'REJECTED'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                              }`}>
+                                {coupon.status}
+                              </span>
+                            </td>
+                            <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 sm:px-6 sm:py-4 lg:table-cell">
+                              {new Date(coupon.expirationDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-sm font-medium sm:px-6 sm:py-4">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditCoupon(coupon)}
+                                  className="rounded-lg p-1.5 text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                                  title="Edit coupon"
+                                >
+                                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete "${coupon.title}"?`)) {
+                                      handleDeleteCoupon(coupon.id)
+                                    }
+                                  }}
+                                  disabled={deletingCouponId === coupon.id}
+                                  className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                  title="Delete coupon"
+                                >
+                                  {deletingCouponId === coupon.id ? (
+                                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/30 sm:px-6">
+                      <div className="flex flex-1 justify-between sm:hidden">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                        >
+                          {t("previous")}
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="relative ml-3 inline-flex items-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                        >
+                          {t("next")}
+                        </button>
+                      </div>
+                      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                            {t("showingPage")} <span className="font-medium">{startIndex + 1}</span> {t("to")} <span className="font-medium">{Math.min(endIndex, filteredCoupons.length)}</span> {t("of")} <span className="font-medium">{filteredCoupons.length}</span> {t("results")}
+                          </p>
+                        </div>
+                        <div>
+                          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentPage === 1}
+                              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed dark:ring-zinc-700 dark:hover:bg-zinc-700"
+                            >
+                              <span className="sr-only">{t("previous")}</span>
+                              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                              // Show first page, last page, current page, and pages around current
+                              if (
+                                page === 1 ||
+                                page === totalPages ||
+                                (page >= currentPage - 1 && page <= currentPage + 1)
+                              ) {
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                                      currentPage === page
+                                        ? "z-10 bg-violet-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+                                        : "text-zinc-900 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50 focus:z-20 focus:outline-offset-0 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-zinc-700"
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                )
+                              } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                return (
+                                  <span key={page} className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-inset ring-zinc-300 dark:text-zinc-300 dark:ring-zinc-700">
+                                    ...
+                                  </span>
+                                )
+                              }
+                              return null
+                            })}
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                              disabled={currentPage === totalPages}
+                              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed dark:ring-zinc-700 dark:hover:bg-zinc-700"
+                            >
+                              <span className="sr-only">{t("next")}</span>
+                              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </nav>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Categories Section */}
+          {section === "categories" && (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">{t("categories")}</h1>
+                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 sm:text-base">{t("addEditCategories")}</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setShowCategoryForm(!showCategoryForm)
+                    setEditingCategoryId(null)
+                    setCategoryForm({ nameEn: "", nameEl: "", slug: "" })
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="whitespace-nowrap">{t("addCategory")}</span>
+                  </div>
+                </Button>
+              </div>
+
+              {/* Success/Error Message */}
+              {message && (
+                <div className={`rounded-xl border p-4 ${
+                  message.type === 'success' 
+                    ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
+                    : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {message.type === 'success' ? (
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="font-medium">{message.text}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Add Category Form */}
+              {showCategoryForm && (
+                <form onSubmit={handleCreateCategory} className="rounded-xl border border-violet-200 bg-violet-50/50 p-6 dark:border-violet-800 dark:bg-violet-900/10">
+                  <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                    {t("createCategory")}
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("englishName")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.nameEn}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, nameEn: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., Electronics"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("greekName")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.nameEl}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, nameEl: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., Ηλεκτρονικά"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("slug")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.slug}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., electronics"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button type="submit" disabled={submittingCategory}>
+                      {submittingCategory ? tCommon("loading") : tCommon("create")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setShowCategoryForm(false)
+                        setCategoryForm({ nameEn: "", nameEl: "", slug: "" })
+                      }}
+                    >
+                      {tCommon("cancel")}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* Edit Category Form */}
+              {editingCategoryId && (
+                <form onSubmit={handleUpdateCategory} className="rounded-xl border border-blue-200 bg-blue-50/50 p-6 dark:border-blue-800 dark:bg-blue-900/10">
+                  <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                    {t("updateCategory")}
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("englishName")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.nameEn}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, nameEn: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., Electronics"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("greekName")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.nameEl}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, nameEl: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., Ηλεκτρονικά"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        {t("slug")}
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.slug}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                        required
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        placeholder="e.g., electronics"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button type="submit" disabled={submittingCategory}>
+                      {submittingCategory ? tCommon("loading") : tCommon("save")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={cancelEdit}
+                    >
+                      {tCommon("cancel")}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* Categories List */}
+              {categories.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {categories.map((category) => (
+                    <div
+                      key={category.id}
+                      className={`rounded-xl border bg-white p-4 transition ${
+                        editingCategoryId === category.id
+                          ? 'border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/20'
+                          : 'border-zinc-200 hover:border-violet-200 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-violet-800'
+                      }`}
+                    >
+                      <div className="mb-2 flex items-start justify-between">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                          <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEditCategory(category)}
+                            className="rounded-lg p-1.5 text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                            title="Edit category"
+                          >
+                            <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete "${category.nameEn}"?`)) {
+                                handleDeleteCategory(category.id)
+                              }
+                            }}
+                            disabled={deletingCategoryId === category.id}
+                            className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                            title="Delete category"
+                          >
+                            {deletingCategoryId === category.id ? (
+                              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            ) : (
+                              <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <h4 className="font-semibold text-zinc-900 dark:text-zinc-50">
+                        {category.nameEn}
+                      </h4>
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        {category.nameEl}
+                      </p>
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                        /{category.slug}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-zinc-200 bg-white p-16 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <svg className="h-8 w-8 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                    No categories yet
+                  </h3>
+                  <p className="text-zinc-600 dark:text-zinc-400">
+                    Create your first category to get started
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Settings Section */}
+          {section === "settings" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">Platform Settings</h1>
+                <p className="mt-2 text-zinc-600 dark:text-zinc-400">Configure platform-wide settings</p>
+              </div>
+
+              {/* Admin Information */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Admin Account</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email</p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{session?.user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Role</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">Administrator</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform Statistics */}
+              {stats && (
+                <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                  <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Platform Overview</h3>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-800">
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{t("totalUsers")}</p>
+                      <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-50">{stats.totalUsers}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-800">
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{t("totalCoupons")}</p>
+                      <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-50">{stats.totalCoupons}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-800">
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{t("categories")}</p>
+                      <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-50">{categories.length}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Advanced Settings */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Advanced Settings</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email Notifications</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Receive platform alerts and updates</p>
+                    </div>
+                    <div className="text-sm text-zinc-500">Coming soon</div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Auto-Approval</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Automatically approve coupons from verified businesses</p>
+                    </div>
+                    <div className="text-sm text-zinc-500">Coming soon</div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Maintenance Mode</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Temporarily disable the platform for maintenance</p>
+                    </div>
+                    <div className="text-sm text-zinc-500">Coming soon</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Overview Section - Default */}
+          {section === "overview" && (
+            <>
 
         {/* Success/Error Message */}
         {message && (
@@ -346,111 +1410,112 @@ export default function AdminDashboard() {
           <>
             {/* Statistics Cards - At the Top */}
             {stats && (
-              <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 lg:mb-8">
                 {/* Total Coupons */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-violet-100 p-3 dark:bg-violet-900/30">
-                    <svg className="h-6 w-6 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-violet-600 dark:text-violet-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
                     {t("totalCoupons")}
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
                     {stats.totalCoupons}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    {stats.approvedCoupons} approved • {stats.pendingCoupons} pending
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
+                    <span className="hidden sm:inline">{stats.approvedCoupons} {t("approved")} • {stats.pendingCoupons} {t("pending")}</span>
+                    <span className="sm:hidden">{stats.approvedCoupons} {t("app")} • {stats.pendingCoupons} {t("pend")}</span>
                   </p>
                 </div>
 
                 {/* Pending Coupons */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-amber-100 p-3 dark:bg-amber-900/30">
-                    <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-amber-600 dark:text-amber-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
                     {t("pendingCoupons")}
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-amber-600 dark:text-amber-500">
+                  <p className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-500 sm:text-3xl md:text-4xl">
                     {stats.pendingCoupons}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    Awaiting review
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
+                    {t("awaiting")}
                   </p>
                 </div>
 
                 {/* Active Members */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-green-100 p-2 dark:bg-green-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-green-600 dark:text-green-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
                     {t("activeMembers")}
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-green-600 dark:text-green-500">
+                  <p className="mt-2 text-2xl font-bold text-green-600 dark:text-green-500 sm:text-3xl md:text-4xl">
                     {stats.activeMembers}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
                     Active subscriptions
                   </p>
                 </div>
 
                 {/* Total Users */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
-                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-blue-600 dark:text-blue-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                    Total Users
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
+                    {t("totalUsers")}
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
                     {stats.totalUsers}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    Registered users
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
+                    {t("registered")}
                   </p>
                 </div>
 
                 {/* Total Businesses */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-purple-100 p-3 dark:bg-purple-900/30">
-                    <svg className="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-purple-600 dark:text-purple-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
                     {t("totalBusinesses")}
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
                     {stats.totalBusinesses}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
                     Business accounts
                   </p>
                 </div>
 
                 {/* Total Categories */}
-                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="absolute right-4 top-4 rounded-full bg-pink-100 p-3 dark:bg-pink-900/30">
-                    <svg className="h-6 w-6 text-pink-600 dark:text-pink-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+                  <div className="absolute right-3 top-3 rounded-lg bg-pink-100 p-2 dark:bg-pink-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-pink-600 dark:text-pink-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm">
                     Categories
                   </h3>
-                  <p className="mt-2 text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <p className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
                     {categories.length}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 sm:text-sm">
                     Active categories
                   </p>
                 </div>
@@ -458,23 +1523,24 @@ export default function AdminDashboard() {
             )}
 
             {/* Tabs */}
-            <div className="mb-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:mb-6">
               <div className="flex gap-1 p-1">
                 <button
                   onClick={() => setActiveTab("coupons")}
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "coupons"
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    {t("pendingCoupons")}
+                    <span className="hidden sm:inline">{t("pendingCoupons")}</span>
+                    <span className="sm:hidden">Coupons</span>
                     {pendingCoupons.length > 0 && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 sm:px-2">
                         {pendingCoupons.length}
                       </span>
                     )}
@@ -482,32 +1548,34 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   onClick={() => setActiveTab("users")}
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "users"
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-                    {t("allUsers")}
+                    <span className="hidden sm:inline">{t("allUsers")}</span>
+                    <span className="sm:hidden">Users</span>
                   </div>
                 </button>
                 <button
                   onClick={() => setActiveTab("categories")}
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "categories"
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    Categories
+                    <span className="hidden sm:inline">Categories</span>
+                    <span className="sm:hidden">Cats</span>
                   </div>
                 </button>
               </div>
@@ -572,7 +1640,7 @@ export default function AdminDashboard() {
                                   <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                                     <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  Expires: {format(new Date(coupon.expirationDate), "MMM dd, yyyy")}
+                                  Expires: {new Date(coupon.expirationDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
                                 </span>
                               </div>
                               
@@ -672,14 +1740,14 @@ export default function AdminDashboard() {
                                 <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
-                                {format(new Date(user.membershipExpiry), "MMM dd, yyyy")}
+                                {new Date(user.membershipExpiry).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
                               </span>
                             ) : (
                               <span className="text-zinc-400">—</span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
-                            {format(new Date(user.createdAt), "MMM dd, yyyy")}
+                            {new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
                           </td>
                         </tr>
                       ))}
@@ -929,7 +1997,415 @@ export default function AdminDashboard() {
             </div>
           </>
         )}
+            </>
+          )}
+        </div>
       </main>
+
+      {/* Edit Coupon Modal */}
+      {editingCouponId && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={cancelCouponEdit}
+        >
+          <div 
+            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 border-b border-zinc-200 bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4 dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">{t("editCoupon")}</h2>
+                <button
+                  onClick={cancelCouponEdit}
+                  className="rounded-lg p-2 text-white transition hover:bg-white/20"
+                >
+                  <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <form onSubmit={handleUpdateCoupon} className="p-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("title")}</label>
+                  <input
+                    type="text"
+                    value={couponForm.title}
+                    onChange={(e) => setCouponForm({ ...couponForm, title: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("code")}</label>
+                  <input
+                    type="text"
+                    value={couponForm.code}
+                    onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("description")}</label>
+                  <textarea
+                    value={couponForm.description}
+                    onChange={(e) => setCouponForm({ ...couponForm, description: e.target.value })}
+                    required
+                    rows={3}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("discountPercentage")}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={couponForm.discountPercentage}
+                    onChange={(e) => setCouponForm({ ...couponForm, discountPercentage: parseInt(e.target.value) || 0 })}
+                    required
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("expirationDate")}</label>
+                  <input
+                    type="datetime-local"
+                    value={couponForm.expirationDate}
+                    onChange={(e) => setCouponForm({ ...couponForm, expirationDate: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("category")}</label>
+                  <select
+                    value={couponForm.categoryId}
+                    onChange={(e) => setCouponForm({ ...couponForm, categoryId: e.target.value })}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="">{t("selectCategory")}</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {locale === "el" ? category.nameEl : category.nameEn}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("status")}</label>
+                  <select
+                    value={couponForm.status}
+                    onChange={(e) => setCouponForm({ ...couponForm, status: e.target.value as "PENDING" | "APPROVED" | "REJECTED" })}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="PENDING">{t("pending")}</option>
+                    <option value="APPROVED">{t("approved")}</option>
+                    <option value="REJECTED">{t("reject")}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-6 flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={cancelCouponEdit}
+                >
+                  {tCommon("cancel")}
+                </Button>
+                <Button type="submit" disabled={submittingCoupon}>
+                  {submittingCoupon ? tCommon("loading") : tCommon("save")}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile Modal */}
+      {selectedUserId && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            setSelectedUserId(null)
+            setSelectedUserProfile(null)
+          }}
+        >
+          <div 
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loadingProfile ? (
+              <div className="flex items-center justify-center p-12">
+                <svg className="h-8 w-8 animate-spin text-violet-600" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : selectedUserProfile ? (
+              <>
+                {/* Header */}
+                <div className="sticky top-0 z-10 border-b border-zinc-200 bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-xl font-bold text-white backdrop-blur-sm">
+                        {selectedUserProfile.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">{selectedUserProfile.name}</h2>
+                        <p className="text-sm text-violet-100">{selectedUserProfile.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedUserId(null)
+                        setSelectedUserProfile(null)
+                      }}
+                      className="rounded-lg p-2 text-white transition hover:bg-white/20"
+                    >
+                      <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-6">
+                  {/* Basic Information */}
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                    <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("basicInformation")}</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Role</p>
+                        <p className={`mt-1 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                          selectedUserProfile.role === 'ADMIN' 
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : selectedUserProfile.role === 'BUSINESS'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        }`}>
+                          {selectedUserProfile.role}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("memberSinceLabel")}</p>
+                        <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                          {new Date(selectedUserProfile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                      {selectedUserProfile.membershipExpiry && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("membershipExpiry")}</p>
+                          <p className="mt-1 text-sm font-medium text-green-600 dark:text-green-400">
+                            {new Date(selectedUserProfile.membershipExpiry).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        </div>
+                      )}
+                      {selectedUserProfile.phone && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("phone")}</p>
+                          <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{selectedUserProfile.phone}</p>
+                        </div>
+                      )}
+                      {selectedUserProfile.birthDate && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("birthDate")}</p>
+                          <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                            {new Date(selectedUserProfile.birthDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        </div>
+                      )}
+                      {selectedUserProfile.address && (
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("address")}</p>
+                          <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{selectedUserProfile.address}</p>
+                        </div>
+                      )}
+                      {selectedUserProfile._count?.coupons !== undefined && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("totalCouponsUser")}</p>
+                          <p className="mt-1 text-2xl font-bold text-violet-600 dark:text-violet-400">{selectedUserProfile._count.coupons}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* About / Description */}
+                  {(selectedUserProfile.about || selectedUserProfile.businessDescription) && (() => {
+                    // Parse business description to extract only the raw text
+                    let descriptionText = ''
+                    let vatNumber = ''
+                    
+                    if (selectedUserProfile.role === 'BUSINESS' && selectedUserProfile.businessDescription) {
+                      try {
+                        const parsed = JSON.parse(selectedUserProfile.businessDescription)
+                        descriptionText = parsed.raw || ''
+                        vatNumber = parsed.vatNumber || ''
+                      } catch {
+                        descriptionText = selectedUserProfile.businessDescription
+                      }
+                    } else {
+                      descriptionText = selectedUserProfile.about || ''
+                    }
+                    
+                    // Only show section if there's actual description text
+                    if (!descriptionText.trim()) return null
+                    
+                    return (
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                        <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                          {selectedUserProfile.role === 'BUSINESS' ? tProfile("businessDescription") : t("about")}
+                        </h3>
+                        <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                          {descriptionText}
+                        </p>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Business Information */}
+                  {selectedUserProfile.role === 'BUSINESS' && (() => {
+                    // Parse business description to extract VAT and other metadata
+                    let vatNumber = ''
+                    let city = ''
+                    let postalCode = ''
+                    
+                    if (selectedUserProfile.businessDescription) {
+                      try {
+                        const parsed = JSON.parse(selectedUserProfile.businessDescription)
+                        vatNumber = parsed.vatNumber || ''
+                        city = parsed.city || ''
+                        postalCode = parsed.postalCode || ''
+                      } catch {
+                        // Not JSON, ignore
+                      }
+                    }
+                    
+                    // Only show if there's at least one business detail
+                    const hasDetails = selectedUserProfile.businessLocation || 
+                                      selectedUserProfile.businessWebsite || 
+                                      (selectedUserProfile.businessCategories && selectedUserProfile.businessCategories.length > 0) ||
+                                      vatNumber || city || postalCode
+                    
+                    if (!hasDetails) return null
+                    
+                    return (
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                        <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("businessDetails")}</h3>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {vatNumber && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("afmTaxId")}</p>
+                              <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{vatNumber}</p>
+                            </div>
+                          )}
+                          {selectedUserProfile.businessLocation && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("location")}</p>
+                              <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{selectedUserProfile.businessLocation}</p>
+                            </div>
+                          )}
+                          {city && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("city")}</p>
+                              <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{city}</p>
+                            </div>
+                          )}
+                          {postalCode && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("postalCode")}</p>
+                              <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{postalCode}</p>
+                            </div>
+                          )}
+                          {selectedUserProfile.businessWebsite && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("website")}</p>
+                              <a 
+                                href={selectedUserProfile.businessWebsite} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="mt-1 text-sm font-medium text-violet-600 hover:underline dark:text-violet-400"
+                              >
+                                {selectedUserProfile.businessWebsite}
+                              </a>
+                            </div>
+                          )}
+                          {selectedUserProfile.businessCategories && selectedUserProfile.businessCategories.length > 0 && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Categories</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {selectedUserProfile.businessCategories.map((cat: any) => (
+                                  <span key={cat.id || cat} className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                    {typeof cat === 'object' ? (locale === 'el' ? cat.nameEl : cat.nameEn) : cat}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Social Media */}
+                  {(selectedUserProfile.businessInstagram || selectedUserProfile.businessFacebook || selectedUserProfile.businessTikTok) && (
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                      <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("socialMedia")}</h3>
+                      <div className="flex flex-wrap gap-3">
+                        {selectedUserProfile.businessInstagram && (
+                          <a 
+                            href={selectedUserProfile.businessInstagram} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-lg bg-pink-100 px-4 py-2 text-sm font-medium text-pink-700 transition hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-300"
+                          >
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2c2.717 0 3.056.01 4.122.06 1.065.05 1.79.217 2.428.465.66.254 1.216.598 1.772 1.153.509.5.902 1.105 1.153 1.772.247.637.415 1.363.465 2.428.047 1.066.06 1.405.06 4.122 0 2.717-.01 3.056-.06 4.122-.05 1.065-.218 1.79-.465 2.428a4.883 4.883 0 01-1.153 1.772c-.5.509-1.105.902-1.772 1.153-.637.247-1.363.415-2.428.465-1.066.047-1.405.06-4.122.06-2.717 0-3.056-.01-4.122-.06-1.065-.05-1.79-.218-2.428-.465a4.89 4.89 0 01-1.772-1.153 4.904 4.904 0 01-1.153-1.772c-.248-.637-.415-1.363-.465-2.428C2.013 15.056 2 14.717 2 12c0-2.717.01-3.056.06-4.122.05-1.066.217-1.79.465-2.428a4.88 4.88 0 011.153-1.772A4.897 4.897 0 015.45 2.525c.638-.248 1.362-.415 2.428-.465C8.944 2.013 9.283 2 12 2zm0 5a5 5 0 100 10 5 5 0 000-10zm6.5-.25a1.25 1.25 0 10-2.5 0 1.25 1.25 0 002.5 0zM12 9a3 3 0 110 6 3 3 0 010-6z"/>
+                            </svg>
+                            Instagram
+                          </a>
+                        )}
+                        {selectedUserProfile.businessFacebook && (
+                          <a 
+                            href={selectedUserProfile.businessFacebook} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300"
+                          >
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                            </svg>
+                            Facebook
+                          </a>
+                        )}
+                        {selectedUserProfile.businessTikTok && (
+                          <a 
+                            href={selectedUserProfile.businessTikTok} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200"
+                          >
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>
+                            </svg>
+                            TikTok
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -25,6 +25,20 @@ const userProfileSelection = {
   businessLongitude: true,
 } as const
 
+const sanitizeBusinessDescription = (value: string | null) => {
+  if (!value) return null
+  if (value.length <= 500) return value
+  try {
+    const parsed = JSON.parse(value)
+    if (typeof parsed.logoUrl === "string" && parsed.logoUrl.length > 120) {
+      parsed.logoUrl = ""
+    }
+    return JSON.stringify(parsed)
+  } catch {
+    return value.slice(0, 500)
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   session: {
@@ -88,7 +102,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.birthDate = dbUser.birthDate?.toISOString() ?? null
           token.phone = dbUser.phone ?? null
           token.about = dbUser.about ?? null
-          token.businessDescription = dbUser.businessDescription ?? null
+          token.businessDescription = sanitizeBusinessDescription(dbUser.businessDescription ?? null)
           token.businessCategories = dbUser.businessCategories ?? []
           token.businessLocation = dbUser.businessLocation ?? null
           token.businessWebsite = dbUser.businessWebsite ?? null
@@ -127,8 +141,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ? new Date(token.birthDate as string)
           : null
         session.user.phone = (token.phone as string | null) ?? null
-        session.user.about = (token.about as string | null) ?? null
         session.user.businessDescription = (token.businessDescription as string | null) ?? null
+        session.user.about = (token.about as string | null) ?? null
         session.user.businessCategories = (token.businessCategories as string[]) ?? []
         session.user.businessLocation = (token.businessLocation as string | null) ?? null
         session.user.businessWebsite = (token.businessWebsite as string | null) ?? null

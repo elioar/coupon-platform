@@ -15,6 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CouponMe - Unlock the Best Deals",
   description: "Access verified discount codes from your favorite brands. Browse for free or become a member to unlock every deal.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
 };
 
 export default function RootLayout({

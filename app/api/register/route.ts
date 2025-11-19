@@ -4,19 +4,39 @@ import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { Role } from "@prisma/client"
 
-const registerSchema = z.object({
+const userSchema = z.object({
+  name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().min(2),
-  role: z.enum(["USER", "BUSINESS"]).default("USER"),
+  role: z.literal("USER"),
 })
+
+const businessSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.literal("BUSINESS"),
+  phone: z.string().min(5),
+  vatNumber: z.string().min(8),
+  categoryId: z.string().min(1),
+  address: z.string().min(3),
+  city: z.string().min(2),
+  postalCode: z.string().min(4),
+  description: z.string().optional(),
+  website: z.string().url().optional().or(z.literal("")),
+  instagram: z.string().url().optional().or(z.literal("")),
+  facebook: z.string().url().optional().or(z.literal("")),
+  tiktok: z.string().url().optional().or(z.literal("")),
+  logoUrl: z.string().optional().nullable(),
+})
+
+const registerSchema = z.discriminatedUnion("role", [userSchema, businessSchema])
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validatedData = registerSchema.parse(body)
 
-    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: validatedData.email },
     })
@@ -28,17 +48,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 10)
 
-    // Create user
+    const baseUserData = {
+      email: validatedData.email,
+      password: hashedPassword,
+      name: validatedData.name,
+      role: validatedData.role as Role,
+    }
+
     const user = await prisma.user.create({
-      data: {
-        email: validatedData.email,
-        password: hashedPassword,
-        name: validatedData.name,
-        role: validatedData.role as Role,
-      },
+      data:
+        validatedData.role === "BUSINESS"
+          ? {
+              ...baseUserData,
+              phone: validatedData.phone,
+              businessLocation: validatedData.address,
+              businessCategories: [validatedData.categoryId],
+              businessWebsite: validatedData.website || null,
+              businessInstagram: validatedData.instagram || null,
+              businessFacebook: validatedData.facebook || null,
+              businessTikTok: validatedData.tiktok || null,
+              businessDescription: JSON.stringify({
+                raw: validatedData.description || "",
+                vatNumber: validatedData.vatNumber,
+                city: validatedData.city ?? "",
+                postalCode: validatedData.postalCode ?? "",
+                logoUrl:
+                  validatedData.logoUrl && validatedData.logoUrl.length <= 120
+                    ? validatedData.logoUrl
+                    : "",
+              }),
+            }
+          : baseUserData,
       select: {
         id: true,
         email: true,
@@ -66,4 +108,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

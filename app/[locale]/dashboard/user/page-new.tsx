@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
 import DashboardSidebar from "@/components/DashboardSidebar"
-import DashboardHeader from "@/components/DashboardHeader"
+import Navigation from "@/components/Navigation"
 import MembershipBadge from "@/components/MembershipBadge"
 import CouponCard from "@/components/CouponCard"
 import { isMember } from "@/lib/client-utils"
@@ -162,54 +162,40 @@ export default function UserDashboard() {
     switch (section) {
       case "overview":
         return (
-          <div className="space-y-5 sm:space-y-6 md:space-y-8">
-            {/* Membership Status Card */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
-                  <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
-                </div>
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
-                  {t("membershipStatus")}
-                </h2>
-              </div>
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">
+                {t("title")}
+              </h1>
+              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+                Welcome back, {session?.user.name}!
+              </p>
+            </div>
+
+            {/* Membership Status */}
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {t("membershipStatus")}
+              </h2>
               <MembershipBadge membershipExpiry={session?.user.membershipExpiry || null} />
             </div>
 
             {/* Available Coupons */}
             <div>
-              <div className="mb-4 flex items-center justify-between sm:mb-6">
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
-                  {t("availableCoupons")}
-                </h2>
-                {coupons.length > 0 && (
-                  <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                    {coupons.length} {coupons.length === 1 ? 'coupon' : 'coupons'}
-                  </span>
-                )}
-              </div>
+              <h2 className="mb-6 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {t("availableCoupons")}
+              </h2>
 
               {loading ? (
-                <div className="flex items-center justify-center rounded-2xl border border-zinc-200 bg-white py-16 dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="text-center">
-                    <div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600"></div>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
-                  </div>
+                <div className="py-12 text-center">
+                  <p className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
                 </div>
               ) : coupons.length === 0 ? (
-                <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900 sm:p-12">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <svg className="h-8 w-8 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 sm:text-base">No coupons available yet.</p>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">Check back later for new deals!</p>
+                <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-zinc-600 dark:text-zinc-400">No coupons available yet.</p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:gap-6">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
                   {coupons.slice(0, 6).map((coupon) => (
                     <CouponCard
                       key={coupon.id}
@@ -228,10 +214,10 @@ export default function UserDashboard() {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
+              <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">
                 {tProfile("title")}
               </h1>
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 sm:text-base">
+              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
                 {tProfile("subtitle")}
               </p>
             </div>
@@ -249,11 +235,11 @@ export default function UserDashboard() {
             )}
 
             <form onSubmit={handleProfileSubmit} className="space-y-6">
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-                <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
                   {tProfile("personalInfo")}
                 </h2>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       {tProfile("name")}
@@ -394,33 +380,22 @@ export default function UserDashboard() {
     }
   }
 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <Navigation />
       <DashboardSidebar
         role="USER"
         locale={locale}
         userName={session?.user.name || "User"}
         userEmail={session?.user.email || ""}
-        isMobileMenuOpen={isMobileMenuOpen}
-        onMobileMenuClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <DashboardHeader
-        userName={session?.user.name || "User"}
-        userEmail={session?.user.email || ""}
-        role="USER"
-        locale={locale}
-        isMobileMenuOpen={isMobileMenuOpen}
-        onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-      />
-
-      <main className="ml-0 flex-1 overflow-x-hidden pt-16 lg:ml-72">
-        <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 lg:px-8">
+      <main className="ml-0 pt-20 lg:ml-72">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           {renderSection()}
         </div>
       </main>
     </div>
   )
 }
+

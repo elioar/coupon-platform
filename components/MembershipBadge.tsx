@@ -1,5 +1,4 @@
 import { useTranslations } from "next-intl"
-import { format } from "date-fns"
 
 interface MembershipBadgeProps {
   membershipExpiry: string | null
@@ -9,6 +8,15 @@ export default function MembershipBadge({ membershipExpiry }: MembershipBadgePro
   const t = useTranslations("membership")
 
   const isMember = membershipExpiry && new Date(membershipExpiry) > new Date()
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: '2-digit' 
+    })
+  }
 
   if (!isMember) {
     return (
@@ -42,7 +50,7 @@ export default function MembershipBadge({ membershipExpiry }: MembershipBadgePro
               {t("active")}
             </p>
             <p className="text-xs text-green-600 dark:text-green-500">
-              {t("expires")}: {format(new Date(membershipExpiry), "MMM dd, yyyy")}
+              {t("expires")}: {formatDate(membershipExpiry)}
             </p>
           </div>
         </div>

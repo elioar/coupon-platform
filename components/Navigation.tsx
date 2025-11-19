@@ -29,7 +29,8 @@ export default function Navigation() {
   }
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: `/${locale}` })
+    await signOut({ redirect: false })
+    router.push(`/${locale}`)
   }
 
   const getDashboardLabel = () => {
@@ -51,6 +52,11 @@ export default function Navigation() {
     return `/${locale}/dashboard/${session.user.role.toLowerCase()}`
   }
 
+  const mobileNavItemClass =
+    "group flex items-center gap-2.5 rounded-xl border border-zinc-200/70 bg-white/70 px-3.5 py-2.5 text-sm font-semibold text-zinc-700 transition-all hover:-translate-y-0.5 hover:border-green-400 hover:text-green-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-100 dark:hover:text-green-300"
+  const mobileNavIconClass =
+    "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 transition-colors group-hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300"
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,6 +71,17 @@ export default function Navigation() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [mobileMenuOpen])
 
   return (
     <>
@@ -116,7 +133,7 @@ export default function Navigation() {
               {t("membership")}
             </Link>
 
-            {session && (
+            {session && session.user.role !== "ADMIN" && (
               <Link
                 href={getDashboardUrl()}
                 className="group flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
@@ -308,16 +325,6 @@ export default function Navigation() {
                           {t("membership")}
                         </Link>
                       )}
-                      <Link
-                        href={`/${locale}/profile`}
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        <svg className="h-4.5 w-4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M12 12a5 5 0 10-5-5 5 5 0 005 5zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" />
-                        </svg>
-                        {t("profile")}
-                      </Link>
                       <div className="my-1.5 h-px bg-zinc-100 dark:bg-zinc-800" />
                       <button
                         onClick={() => {
@@ -345,7 +352,7 @@ export default function Navigation() {
               >
                 {/* Add Your Coupon Button for Unregistered Users */}
                 <Link
-                  href={`/${locale}/register?type=business`}
+                  href={`/${locale}/register/business`}
                   className="group flex items-center gap-2 rounded-xl border-2 border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-100 hover:shadow dark:border-green-800 dark:bg-green-900/20 dark:text-green-300 dark:hover:border-green-700 dark:hover:bg-green-900/30"
                 >
                   <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
@@ -400,293 +407,207 @@ export default function Navigation() {
       </div>
     </nav>
 
-      {mobileMenuOpen && (
-        <>
-          {/* Mobile Sidebar Overlay */}
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              key="menu-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
 
-          {/* Sidebar */}
-          <div
-            className={`fixed left-0 top-0 z-50 h-full w-80 max-w-[85vw] transform bg-white shadow-2xl transition-transform duration-300 ease-out dark:bg-zinc-900 md:hidden flex flex-col ${
-              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
-          >
-            {/* Sidebar Header */}
-            <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
-              <Link
-                href={`/${locale}`}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2.5"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 shadow-md">
-                  <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-                <span className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                  {tCommon("appName")}
-                </span>
-              </Link>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="rounded-lg p-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                aria-label="Close menu"
-              >
-                <svg
-                  className="h-5 w-5 text-zinc-700 dark:text-zinc-300"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto px-3 py-3">
-              {/* User Profile Section */}
-              {session ? (
-                <div className="mb-3 rounded-xl border border-zinc-200 bg-gradient-to-br from-green-50 to-emerald-50 p-2.5 dark:border-zinc-800 dark:from-green-900/20 dark:to-emerald-900/20">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-sm font-bold text-white shadow-md flex-shrink-0">
-                      {session.user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                        {session.user.name}
-                      </p>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 truncate">
-                        {session.user.email}
-                      </p>
-                      <div className="mt-1">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          session.user.role === 'ADMIN'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                            : session.user.role === 'BUSINESS'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        }`}>
-                          <span className="h-1 w-1 rounded-full bg-current"></span>
-                          {session.user.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Navigation Links */}
-              <nav className="space-y-0.5">
-                <Link
-                  href={`/${locale}/coupons`}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200 dark:bg-green-900/30 dark:group-hover:bg-green-900/50 flex-shrink-0">
-                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            {/* Mobile Menu Drawer */}
+            <motion.div
+              key="menu-drawer"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col overflow-hidden bg-white dark:bg-zinc-950 md:hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                <Link href={`/${locale}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600">
+                    <svg className="h-4 w-4 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
-                  <span>{t("coupons")}</span>
+                  <span className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{tCommon("appName")}</span>
                 </Link>
-                
-                <Link
-                  href={`/${locale}/membership`}
+                <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                  className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                  aria-label="Close menu"
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 transition-colors group-hover:bg-amber-200 dark:bg-amber-900/30 dark:group-hover:bg-amber-900/50 flex-shrink-0">
-                    <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto">
+                {/* User Info (if logged in) */}
+                {session && (
+                  <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-sm font-bold text-white">
+                        {session.user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{session.user.name}</p>
+                        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{session.user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation Links */}
+                <div className="p-3 space-y-1">
+                  <Link
+                    href={`/${locale}/coupons`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    <span>{t("coupons")}</span>
+                  </Link>
+
+                  <Link
+                    href={`/${locale}/membership`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
-                  </div>
-                  <span>{t("membership")}</span>
-                </Link>
+                    <span>{t("membership")}</span>
+                  </Link>
 
-                {session ? (
-                  <>
+                  {session && (
                     <Link
                       href={getDashboardUrl()}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 transition-colors group-hover:bg-blue-200 dark:bg-blue-900/30 dark:group-hover:bg-blue-900/50 flex-shrink-0">
-                        <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                      </div>
+                      <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
                       <span>{getDashboardLabel()}</span>
                     </Link>
+                  )}
 
-                    {session.user.role === "USER" && (
-                      <Link
-                        href={`/${locale}/membership`}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200 dark:bg-green-900/30 dark:group-hover:bg-green-900/50 flex-shrink-0">
-                          <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                        </svg>
-                      </div>
-                      <span>{t("membership")}</span>
+                  {!session && (
+                    <Link
+                      href={`/${locale}/register/business`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M9 17v2a2 2 0 002 2h2a2 2 0 002-2v-2m3-5a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{t("listBusiness")}</span>
                     </Link>
                   )}
-                    <Link
-                      href={`/${locale}/profile`}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 transition-colors group-hover:bg-zinc-200 dark:bg-zinc-800/60 dark:group-hover:bg-zinc-700 flex-shrink-0">
-                        <svg className="h-4 w-4 text-zinc-600 dark:text-zinc-300" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M12 12a5 5 0 10-5-5 5 5 0 005 5zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" />
-                        </svg>
-                      </div>
-                      <span>{t("profile")}</span>
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href={`/${locale}/register?type=business`}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="group flex items-center gap-2.5 rounded-lg border-2 border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 transition-all hover:border-green-300 hover:bg-green-100 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300 dark:hover:border-green-700 dark:hover:bg-green-900/30"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-200 dark:bg-green-900/30 flex-shrink-0">
-                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M12 4v16m8-8H4" />
-                        </svg>
-                      </div>
-                      <span className="text-xs">Add Your Coupon</span>
-                    </Link>
-                  </>
-                )}
-              </nav>
 
-              {/* Divider */}
-              <div className="my-3 h-px bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="my-2 border-t border-zinc-200 dark:border-zinc-800" />
 
-              {/* Theme & Language Switcher - Compact Grid */}
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                {/* Theme Switcher */}
-                <div>
-                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    Theme
-                  </p>
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => {
-                        setTheme("light")
-                        setMobileMenuOpen(false)
-                      }}
-                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                        theme === "light"
-                          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          : "text-zinc-700 hover:bg-green-50 dark:text-zinc-300 dark:hover:bg-green-900/20"
-                      }`}
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  {/* Language Switcher */}
+                  <div className="px-3 py-2">
+                    <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">Language</p>
+                    <div className="flex gap-2">
+                      <Link
+                        href={switchLocale("en")}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                          locale === "en"
+                            ? "border-green-500 bg-green-50 text-green-700 dark:border-green-500 dark:bg-green-900/30 dark:text-green-300"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        }`}
+                      >
+                        EN
+                      </Link>
+                      <Link
+                        href={switchLocale("el")}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                          locale === "el"
+                            ? "border-green-500 bg-green-50 text-green-700 dark:border-green-500 dark:bg-green-900/30 dark:text-green-300"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        }`}
+                      >
+                        EL
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Theme Toggle */}
+                  <button
+                    onClick={() => {
+                      setTheme(resolvedTheme === "dark" ? "light" : "dark")
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {resolvedTheme === "dark" ? (
+                      <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                         <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                       </svg>
-                      <span className="text-xs">Light</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTheme("dark")
-                        setMobileMenuOpen(false)
-                      }}
-                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                        theme === "dark"
-                          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          : "text-zinc-700 hover:bg-green-50 dark:text-zinc-300 dark:hover:bg-green-900/20"
-                      }`}
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    ) : (
+                      <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                         <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                       </svg>
-                      <span className="text-xs">Dark</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Language Switcher */}
-                <div>
-                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    Language
-                  </p>
-                  <div className="space-y-1">
-                    <Link
-                      href={switchLocale("en")}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                        locale === "en"
-                          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          : "text-zinc-700 hover:bg-green-50 dark:text-zinc-300 dark:hover:bg-green-900/20"
-                      }`}
-                    >
-                      <span className="text-base">🇬🇧</span>
-                      <span className="text-xs">EN</span>
-                    </Link>
-                    <Link
-                      href={switchLocale("el")}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                        locale === "el"
-                          ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          : "text-zinc-700 hover:bg-green-50 dark:text-zinc-300 dark:hover:bg-green-900/20"
-                      }`}
-                    >
-                      <span className="text-base">🇬🇷</span>
-                      <span className="text-xs">EL</span>
-                    </Link>
-                  </div>
+                    )}
+                    <span>{resolvedTheme === "dark" ? "Light" : "Dark"}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Auth Buttons / Logout */}
-              {session ? (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    handleSignOut()
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition-all hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:border-red-700 dark:hover:bg-red-900/30"
-                >
-                  <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  <span>{t("logout")}</span>
-                </button>
-              ) : (
-                <div className="space-y-1.5">
-                  <Link
-                    href={`/${locale}/login`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+              {/* Footer */}
+              <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+                {session ? (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      handleSignOut()
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
-                    {t("login")}
-                  </Link>
-                  <Link
-                    href={`/${locale}/register`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl active:scale-95"
-                  >
-                    {t("register")}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>{t("logout")}</span>
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <Link
+                      href={`/${locale}/login`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <span>{t("login")}</span>
+                    </Link>
+                    <Link
+                      href={`/${locale}/register`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:from-green-600 hover:to-emerald-700"
+                    >
+                      <span>{t("register")}</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }
