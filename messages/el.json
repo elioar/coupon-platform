@@ -12,7 +12,9 @@
     "back": "Πίσω",
     "search": "Αναζήτηση",
     "filter": "Φίλτρο",
-    "all": "Όλα"
+    "all": "Όλα",
+    "close": "Κλείσιμο",
+    "coupons": "Κουπόνια"
   },
   "nav": {
     "home": "Αρχική",
@@ -232,11 +234,26 @@
     },
     "cta": "Εγγραφή Τώρα",
     "active": "Ενεργό Μέλος",
+    "activeMember": "Ενεργό Μέλος",
     "expires": "Η συνδρομή λήγει στις",
+    "expiresOn": "Λήγει στις",
+    "expiresTomorrow": "Λήγει αύριο",
+    "expiresInDays": "Λήγει σε {days} ημέρες",
     "renew": "Ανανέωση Συνδρομής",
     "notMember": "Δεν είστε ακόμα μέλος",
     "paymentCanceled": "Η πληρωμή ακυρώθηκε. Μπορείτε να δοκιμάσετε ξανά ανά πάσα στιγμή.",
-    "thankYou": "Ευχαριστούμε για την εγγραφή σας."
+    "thankYou": "Ευχαριστούμε για την εγγραφή σας.",
+    "manageMembership": "Διαχείριση συνδρομής και συνδρομής",
+    "premiumAccess": "Ενεργοποιημένη premium πρόσβαση",
+    "unlimitedAccess": "Απεριόριστη Πρόσβαση",
+    "allFeaturesUnlocked": "Όλα τα premium χαρακτηριστικά ξεκλειδώθηκαν",
+    "upgradeToUnlock": "Αναβάθμιση για ξεκλείδωμα όλων των premium χαρακτηριστικών και αποκλειστικών προσφορών",
+    "upgradeToPremium": "Αναβάθμιση σε Premium",
+    "membershipBenefits": "Προνόμια Μέλους",
+    "unlimitedAccessToCodes": "Απεριόριστη πρόσβαση σε όλους τους κωδικούς κουπονιών",
+    "exclusiveDeals": "Αποκλειστικές προσφορές από κορυφαίες μάρκες",
+    "earlyAccess": "Πρώτη πρόσβαση σε νέα κουπόνια",
+    "prioritySupport": "Υποστήριξη πελατών προτεραιότητας"
   },
   "coupons": {
     "title": "Διαθέσιμα Κουπόνια",
@@ -285,12 +302,15 @@
     "locationLabel": "Τοποθεσία",
     "locationUnknown": "Μη διαθέσιμη τοποθεσία",
     "distanceAwayKm": "{distance} χλμ μακριά",
-    "distanceAwayMeters": "{distance} μ. μακριά"
+    "distanceAwayMeters": "{distance} μ. μακριά",
+    "saveCoupon": "Αποθήκευση κουπονιού",
+    "unsaveCoupon": "Αφαίρεση από αποθηκευμένα"
   },
   "dashboard": {
     "sidebar": {
       "overview": "Επισκόπηση",
       "profile": "Προφίλ",
+      "saved": "Αποθηκευμένα",
       "membership": "Συνδρομή",
       "settings": "Ρυθμίσεις",
       "logout": "Αποσύνδεση",
@@ -311,7 +331,25 @@
       "membershipStatus": "Κατάσταση Συνδρομής",
       "availableCoupons": "Διαθέσιμα Κουπόνια",
       "noCouponsAvailable": "Δεν υπάρχουν διαθέσιμα κουπόνια αυτή τη στιγμή",
-      "checkBackLater": "Ελέγξτε ξανά αργότερα για νέες προσφορές!"
+      "checkBackLater": "Ελέγξτε ξανά αργότερα για νέες προσφορές!",
+      "welcomeBack": "Καλώς ήρθατε, {name}!",
+      "activityDescription": "Εδώ είναι η δραστηριότητα των κουπονιών σας και οι τελευταίες προσφορές",
+      "savedCoupons": "Αποθηκευμένα Κουπόνια",
+      "bookmarkedDeals": "Σελιδοδετημένες προσφορές",
+      "redemptions": "Εξαργυρώσεις",
+      "codesCopied": "Κωδικοί αντιγράφηκαν",
+      "membership": "Συνδρομή",
+      "expiresOn": "Λήγει στις",
+      "notActive": "Μη ενεργό",
+      "noMembership": "Χωρίς συνδρομή",
+      "latest": "Τελευταία",
+      "newCoupons": "Νέα κουπόνια",
+      "lastRedemptions": "Τελευταίες Εξαργυρώσεις",
+      "latestCoupons": "Τελευταία Κουπόνια",
+      "code": "Κωδικός",
+      "savedCouponsDescription": "Τα σελιδοδετημένα κουπόνια σας για εύκολη πρόσβαση",
+      "noSavedCoupons": "Δεν υπάρχουν αποθηκευμένα κουπόνια ακόμα",
+      "noSavedCouponsDescription": "Ξεκινήστε να αποθηκεύετε κουπόνια που σας αρέσουν κάνοντας κλικ στο εικονίδιο σελιδοδείκτη σε οποιαδήποτε κάρτα κουπονιού"
     },
     "business": {
       "title": "Πίνακας Επιχείρησης",
@@ -440,7 +478,15 @@
       "next": "Επόμενο",
       "showingPage": "Εμφάνιση",
       "to": "έως",
-      "results": "αποτελέσματα"
+      "results": "αποτελέσματα",
+      "couponDetails": "Λεπτομέρειες Κουπονιού",
+      "businessInformation": "Πληροφορίες Επιχείρησης",
+      "businessName": "Όνομα Επιχείρησης",
+      "businessEmail": "Email Επιχείρησης",
+      "views": "Προβολές",
+      "clicks": "Κλικ",
+      "redemptions": "Εξαργυρώσεις",
+      "saves": "Αποθηκεύσεις"
     }
   },
   "profile": {

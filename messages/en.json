@@ -12,7 +12,9 @@
     "back": "Back",
     "search": "Search",
     "filter": "Filter",
-    "all": "All"
+    "all": "All",
+    "close": "Close",
+    "coupons": "Coupons"
   },
   "nav": {
     "home": "Home",
@@ -232,11 +234,26 @@
     },
     "cta": "Subscribe Now",
     "active": "Active Member",
+    "activeMember": "Active Member",
     "expires": "Membership expires on",
+    "expiresOn": "Expires on",
+    "expiresTomorrow": "Expires tomorrow",
+    "expiresInDays": "Expires in {days} days",
     "renew": "Renew Membership",
     "notMember": "You are not a member yet",
     "paymentCanceled": "Payment was canceled. You can try again anytime.",
-    "thankYou": "Thank you for subscribing."
+    "thankYou": "Thank you for subscribing.",
+    "manageMembership": "Manage your membership and subscription",
+    "premiumAccess": "Premium access enabled",
+    "unlimitedAccess": "Unlimited Access",
+    "allFeaturesUnlocked": "All premium features unlocked",
+    "upgradeToUnlock": "Upgrade to unlock all premium features and exclusive deals",
+    "upgradeToPremium": "Upgrade to Premium",
+    "membershipBenefits": "Membership Benefits",
+    "unlimitedAccessToCodes": "Unlimited access to all coupon codes",
+    "exclusiveDeals": "Exclusive deals from top brands",
+    "earlyAccess": "Early access to new coupons",
+    "prioritySupport": "Priority customer support"
   },
   "coupons": {
     "title": "Available Coupons",
@@ -285,12 +302,15 @@
     "locationLabel": "Location",
     "locationUnknown": "Location unavailable",
     "distanceAwayKm": "{distance} km away",
-    "distanceAwayMeters": "{distance} m away"
+    "distanceAwayMeters": "{distance} m away",
+    "saveCoupon": "Save coupon",
+    "unsaveCoupon": "Remove from saved"
   },
   "dashboard": {
     "sidebar": {
       "overview": "Overview",
       "profile": "Profile",
+      "saved": "Saved",
       "membership": "Membership",
       "settings": "Settings",
       "logout": "Logout",
@@ -311,7 +331,25 @@
       "membershipStatus": "Membership Status",
       "availableCoupons": "Available Coupons",
       "noCouponsAvailable": "No coupons available at the moment",
-      "checkBackLater": "Check back later for new deals!"
+      "checkBackLater": "Check back later for new deals!",
+      "welcomeBack": "Welcome back, {name}!",
+      "activityDescription": "Here's your coupon activity and latest deals",
+      "savedCoupons": "Saved Coupons",
+      "bookmarkedDeals": "Bookmarked deals",
+      "redemptions": "Redemptions",
+      "codesCopied": "Codes copied",
+      "membership": "Membership",
+      "expiresOn": "Expires on",
+      "notActive": "Not active",
+      "noMembership": "No membership",
+      "latest": "Latest",
+      "newCoupons": "New coupons",
+      "lastRedemptions": "Last Redemptions",
+      "latestCoupons": "Latest Coupons",
+      "code": "Code",
+      "savedCouponsDescription": "Your bookmarked coupons for easy access",
+      "noSavedCoupons": "No saved coupons yet",
+      "noSavedCouponsDescription": "Start saving coupons you like by clicking the bookmark icon on any coupon card"
     },
     "business": {
       "title": "Business Dashboard",
@@ -440,7 +478,15 @@
       "next": "Next",
       "showingPage": "Showing",
       "to": "to",
-      "results": "results"
+      "results": "results",
+      "couponDetails": "Coupon Details",
+      "businessInformation": "Business Information",
+      "businessName": "Business Name",
+      "businessEmail": "Business Email",
+      "views": "Views",
+      "clicks": "Clicks",
+      "redemptions": "Redemptions",
+      "saves": "Saves"
     }
   },
   "profile": {

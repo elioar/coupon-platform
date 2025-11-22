@@ -17,6 +17,7 @@ interface Coupon {
   discountPercentage: number
   expirationDate: string
   status: string
+  imagePath?: string | null
   business?: {
     id: string
     name: string
@@ -54,6 +55,58 @@ interface Category {
   nameEn: string
   nameEl: string
   slug: string
+}
+
+// Skeleton Components
+function AdminOverviewSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+            <div className="mb-2 h-8 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800 sm:h-10" />
+            <div className="h-3 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AdminCouponsTableSkeleton() {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-zinc-50 dark:bg-zinc-900/50">
+            <tr>
+              {[...Array(6)].map((_, i) => (
+                <th key={i} className="px-4 py-3 text-left">
+                  <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {[...Array(5)].map((_, i) => (
+              <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                {[...Array(6)].map((_, j) => (
+                  <td key={j} className="px-4 py-4">
+                    <div className="h-4 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 export default function AdminDashboard() {
@@ -97,6 +150,14 @@ export default function AdminDashboard() {
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
   const [viewingCouponId, setViewingCouponId] = useState<string | null>(null)
+  const [viewingCouponData, setViewingCouponData] = useState<Coupon | null>(null)
+  const [loadingCouponDetails, setLoadingCouponDetails] = useState(false)
+  const [couponAnalytics, setCouponAnalytics] = useState<{
+    views: number
+    clicks: number
+    redemptions: number
+    saves?: number
+  } | null>(null)
   const [couponForm, setCouponForm] = useState({
     title: "",
     description: "",
@@ -497,16 +558,57 @@ export default function AdminDashboard() {
 
   const handleViewCoupon = async (couponId: string) => {
     setViewingCouponId(couponId)
+    setLoadingCouponDetails(true)
     try {
-      const response = await fetch(`/api/coupons/${couponId}`)
-      const data = await response.json()
-      if (response.ok) {
-        // Coupon details will be shown in modal
+      // Fetch coupon details and analytics in parallel
+      const [couponResponse, analyticsResponse] = await Promise.all([
+        fetch(`/api/coupons/${couponId}`),
+        fetch(`/api/admin/coupons/${couponId}/analytics`)
+      ])
+      
+      const couponData = await couponResponse.json()
+      if (couponResponse.ok) {
+        setViewingCouponData(couponData.coupon || couponData)
+      } else {
+        setMessage({ type: 'error', text: 'Failed to load coupon details' })
+        setViewingCouponId(null)
+        setLoadingCouponDetails(false)
+        return
+      }
+
+      // Handle analytics
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json()
+        setCouponAnalytics(analyticsData)
+      } else {
+        // If analytics endpoint doesn't exist, set defaults
+        setCouponAnalytics({ views: 0, clicks: 0, redemptions: 0, saves: 0 })
       }
     } catch (error) {
       console.error("Error fetching coupon:", error)
+      setMessage({ type: 'error', text: 'Error loading coupon details' })
+      setViewingCouponId(null)
+    } finally {
+      setLoadingCouponDetails(false)
     }
   }
+
+  const closeCouponModal = () => {
+    setViewingCouponId(null)
+    setViewingCouponData(null)
+    setCouponAnalytics(null)
+  }
+
+  // Handle Escape key to close coupon modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && viewingCouponId) {
+        closeCouponModal()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [viewingCouponId])
 
   const cancelCouponEdit = () => {
     setEditingCouponId(null)
@@ -834,12 +936,7 @@ export default function AdminDashboard() {
 
               {/* Coupons Table */}
               {loadingCoupons ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="text-center">
-                    <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600"></div>
-                    <p className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
-                  </div>
-                </div>
+                <AdminCouponsTableSkeleton />
               ) : allCoupons.length === 0 ? (
                 <div className="rounded-xl border border-zinc-200 bg-white p-16 text-center dark:border-zinc-800 dark:bg-zinc-900">
                   <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
@@ -888,7 +985,11 @@ export default function AdminDashboard() {
                       </thead>
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                         {paginatedCoupons.map((coupon) => (
-                          <tr key={coupon.id} className="transition hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                          <tr 
+                            key={coupon.id} 
+                            className="cursor-pointer transition hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30"
+                            onClick={() => handleViewCoupon(coupon.id)}
+                          >
                             <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
                               <div className="font-medium text-zinc-900 dark:text-zinc-100">{coupon.title}</div>
                             </td>
@@ -916,7 +1017,17 @@ export default function AdminDashboard() {
                               {new Date(coupon.expirationDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-sm font-medium sm:px-6 sm:py-4">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handleViewCoupon(coupon.id)}
+                                  className="rounded-lg p-1.5 text-violet-600 transition-colors hover:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                  title="View details"
+                                >
+                                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
                                 <button
                                   onClick={() => handleEditCoupon(coupon)}
                                   className="rounded-lg p-1.5 text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
@@ -1400,12 +1511,7 @@ export default function AdminDashboard() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600"></div>
-              <p className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
-            </div>
-          </div>
+          <AdminOverviewSkeleton />
         ) : (
           <>
             {/* Statistics Cards - At the Top */}
@@ -2123,6 +2229,211 @@ export default function AdminDashboard() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon Details Modal */}
+      {viewingCouponId && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+          onClick={closeCouponModal}
+        >
+          <div 
+            className="relative w-full h-[95vh] sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-2xl border-t sm:border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loadingCouponDetails ? (
+              <div className="flex items-center justify-center p-12">
+                <svg className="h-8 w-8 animate-spin text-violet-600" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : viewingCouponData ? (
+              <>
+                {/* Modal Header - Sticky on Mobile */}
+                <div className="sticky top-0 z-10 border-b border-zinc-200 bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 sm:px-6 sm:py-4 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg sm:text-xl font-bold text-white">{t("couponDetails")}</h2>
+                    <button
+                      onClick={closeCouponModal}
+                      className="rounded-lg p-2 text-white transition hover:bg-white/20"
+                    >
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Content - Responsive Grid Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
+                  {/* Left Column - Image & Analytics */}
+                  <div className="lg:col-span-1 lg:border-r border-b lg:border-b-0 border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 sm:space-y-6">
+                    {/* Coupon Image */}
+                    {viewingCouponData.imagePath ? (
+                      <div className="overflow-hidden rounded-xl">
+                        <img 
+                          src={viewingCouponData.imagePath} 
+                          alt={viewingCouponData.title}
+                          className="h-40 sm:h-48 w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-40 sm:h-48 w-full items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/20 dark:to-purple-900/20">
+                        <svg className="h-12 w-12 sm:h-16 sm:w-16 text-violet-400 dark:text-violet-600" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Analytics Section */}
+                    {couponAnalytics && (
+                      <div className="space-y-3">
+                        <h3 className="text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wide">Analytics</h3>
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                          <div className="rounded-lg border border-zinc-200 bg-gradient-to-br from-blue-50 to-white p-2.5 sm:p-3 dark:border-zinc-800 dark:from-blue-950/20 dark:to-zinc-900">
+                            <div className="mb-1 sm:mb-1.5 flex items-center gap-1 sm:gap-1.5">
+                              <div className="rounded bg-blue-100 p-1 dark:bg-blue-900/30">
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </div>
+                              <span className="text-[10px] sm:text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("views")}</span>
+                            </div>
+                            <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">{couponAnalytics.views}</p>
+                          </div>
+
+                          <div className="rounded-lg border border-zinc-200 bg-gradient-to-br from-violet-50 to-white p-2.5 sm:p-3 dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+                            <div className="mb-1 sm:mb-1.5 flex items-center gap-1 sm:gap-1.5">
+                              <div className="rounded bg-violet-100 p-1 dark:bg-violet-900/30">
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                </svg>
+                              </div>
+                              <span className="text-[10px] sm:text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("clicks")}</span>
+                            </div>
+                            <p className="text-lg sm:text-xl font-bold text-violet-600 dark:text-violet-400">{couponAnalytics.clicks}</p>
+                          </div>
+
+                          <div className="rounded-lg border border-zinc-200 bg-gradient-to-br from-green-50 to-white p-2.5 sm:p-3 dark:border-zinc-800 dark:from-green-950/20 dark:to-zinc-900">
+                            <div className="mb-1 sm:mb-1.5 flex items-center gap-1 sm:gap-1.5">
+                              <div className="rounded bg-green-100 p-1 dark:bg-green-900/30">
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
+                              <span className="text-[10px] sm:text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("redemptions")}</span>
+                            </div>
+                            <p className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">{couponAnalytics.redemptions}</p>
+                          </div>
+
+                          <div className="rounded-lg border border-zinc-200 bg-gradient-to-br from-amber-50 to-white p-2.5 sm:p-3 dark:border-zinc-800 dark:from-amber-950/20 dark:to-zinc-900">
+                            <div className="mb-1 sm:mb-1.5 flex items-center gap-1 sm:gap-1.5">
+                              <div className="rounded bg-amber-100 p-1 dark:bg-amber-900/30">
+                                <svg className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600 dark:text-amber-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                </svg>
+                              </div>
+                              <span className="text-[10px] sm:text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("saves")}</span>
+                            </div>
+                            <p className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400">{couponAnalytics.saves || 0}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column - Details */}
+                  <div className="lg:col-span-2 p-4 sm:p-6 space-y-4 sm:space-y-5">
+                    {/* Title & Status */}
+                    <div>
+                      <div className="mb-2 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                        <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-50 pr-2">{viewingCouponData.title}</h3>
+                        <span className={`shrink-0 self-start sm:self-auto inline-flex rounded-full px-2.5 sm:px-3 py-1 text-xs font-semibold ${
+                          viewingCouponData.status === 'APPROVED'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : viewingCouponData.status === 'REJECTED'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                        }`}>
+                          {viewingCouponData.status}
+                        </span>
+                      </div>
+                      {viewingCouponData.description && (
+                        <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2">{viewingCouponData.description}</p>
+                      )}
+                    </div>
+
+                    {/* Key Information Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("code")}</span>
+                        <p className="mt-1 font-mono text-sm font-bold text-violet-600 dark:text-violet-400 break-all">{viewingCouponData.code}</p>
+                      </div>
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("discountPercentage")}</span>
+                        <p className="mt-1 text-base sm:text-lg font-bold text-violet-600 dark:text-violet-400">{viewingCouponData.discountPercentage}%</p>
+                      </div>
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("expirationDate")}</span>
+                        <p className="mt-1 text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                          {new Date(viewingCouponData.expirationDate).toLocaleDateString(locale, { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t("category")}</span>
+                        <p className="mt-1 text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                          {locale === "el" ? viewingCouponData.category?.nameEl : viewingCouponData.category?.nameEn}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Business Information */}
+                    {viewingCouponData.business && (
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 sm:p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t("businessInformation")}</h4>
+                        <div className="space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                            <span className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400">{t("businessName")}</span>
+                            <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-50 break-words">{viewingCouponData.business.name}</p>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                            <span className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400">{t("businessEmail")}</span>
+                            <p className="text-xs sm:text-sm text-zinc-900 dark:text-zinc-50 break-all">{viewingCouponData.business.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                      <button
+                        onClick={() => {
+                          closeCouponModal()
+                          handleEditCoupon(viewingCouponData)
+                        }}
+                        className="w-full sm:flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-4 py-2.5 sm:py-2.5 font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40"
+                      >
+                        {t("editCoupon")}
+                      </button>
+                      <button
+                        onClick={closeCouponModal}
+                        className="w-full sm:w-auto rounded-xl border border-zinc-300 bg-white px-4 py-2.5 font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      >
+                        {tCommon("close")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}

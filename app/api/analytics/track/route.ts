@@ -12,9 +12,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!["VIEW", "CLICK", "REDEMPTION"].includes(eventType)) {
+    if (!["VIEW", "CLICK", "REDEMPTION", "SAVE"].includes(eventType)) {
       return NextResponse.json(
-        { error: "Invalid eventType. Must be VIEW, CLICK, or REDEMPTION" },
+        { error: "Invalid eventType. Must be VIEW, CLICK, REDEMPTION, or SAVE" },
         { status: 400 }
       )
     }

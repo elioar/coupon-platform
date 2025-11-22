@@ -22,11 +22,11 @@ const businessSchema = z.object({
   address: z.string().min(3),
   city: z.string().min(2),
   postalCode: z.string().min(4),
-  description: z.string().optional(),
-  website: z.string().url().optional().or(z.literal("")),
-  instagram: z.string().url().optional().or(z.literal("")),
-  facebook: z.string().url().optional().or(z.literal("")),
-  tiktok: z.string().url().optional().or(z.literal("")),
+  description: z.string().optional().or(z.literal("")),
+  website: z.union([z.string().url(), z.literal("")]).optional(),
+  instagram: z.union([z.string().url(), z.literal("")]).optional(),
+  facebook: z.union([z.string().url(), z.literal("")]).optional(),
+  tiktok: z.union([z.string().url(), z.literal("")]).optional(),
   logoUrl: z.string().optional().nullable(),
 })
 

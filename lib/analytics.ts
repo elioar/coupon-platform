@@ -1,6 +1,6 @@
 export async function trackCouponEvent(
   couponId: string,
-  eventType: "VIEW" | "CLICK" | "REDEMPTION",
+  eventType: "VIEW" | "CLICK" | "REDEMPTION" | "SAVE",
   userId?: string
 ) {
   try {

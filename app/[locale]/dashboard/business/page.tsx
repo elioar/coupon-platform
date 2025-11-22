@@ -10,6 +10,7 @@ import DashboardHeader from "@/components/DashboardHeader"
 import Button from "@/components/Button"
 import { useRouter } from "next/navigation"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { AnimatePresence, motion } from 'framer-motion'
 
 const formatExpirationDate = (dateString: string, locale: string) => {
   const date = new Date(dateString)
@@ -558,6 +559,148 @@ export default function BusinessDashboard() {
     }
   }
 
+  // Skeleton Loader Components
+  const OverviewSkeleton = () => (
+    <div className="space-y-8 animate-pulse">
+      {/* Stats Cards Skeleton */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-2xl bg-gray-100 dark:bg-zinc-800 p-6">
+            <div className="h-3 w-24 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
+            <div className="h-8 w-16 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
+            <div className="h-3 w-20 bg-gray-300 dark:bg-zinc-700 rounded"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Actions Skeleton */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+            <div className="h-10 w-10 bg-gray-200 dark:bg-zinc-700 rounded-lg mb-4"></div>
+            <div className="h-5 w-24 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
+            <div className="h-4 w-32 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Status Overview Skeleton */}
+      <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+        <div className="h-6 w-40 bg-gray-300 dark:bg-zinc-700 rounded mb-6"></div>
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="mb-4">
+            <div className="flex justify-between mb-2">
+              <div className="h-4 w-24 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+              <div className="h-4 w-12 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            </div>
+            <div className="h-2 w-full bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Coupons Skeleton */}
+      <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+        <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="flex items-center gap-4 py-3 border-b border-gray-200 dark:border-zinc-800 last:border-0">
+            <div className="h-12 w-12 bg-gray-200 dark:bg-zinc-700 rounded-lg"></div>
+            <div className="flex-1">
+              <div className="h-4 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
+              <div className="h-3 w-24 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            </div>
+            <div className="h-6 w-16 bg-gray-200 dark:bg-zinc-700 rounded-full"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  const InsightsSkeleton = () => (
+    <div className="space-y-8 animate-pulse">
+      {/* Summary Cards Skeleton */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+            <div className="h-4 w-20 bg-gray-300 dark:bg-zinc-700 rounded mb-3"></div>
+            <div className="h-8 w-24 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
+            <div className="h-3 w-16 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Skeleton */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+          <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-6"></div>
+          <div className="h-64 bg-gray-100 dark:bg-zinc-800 rounded"></div>
+        </div>
+        <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+          <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-6"></div>
+          <div className="h-64 bg-gray-100 dark:bg-zinc-800 rounded"></div>
+        </div>
+      </div>
+
+      {/* Top Coupons & Category Stats Skeleton */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+          <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-zinc-800 last:border-0">
+              <div className="h-4 w-32 bg-gray-300 dark:bg-zinc-700 rounded"></div>
+              <div className="h-4 w-16 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+          <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-zinc-800 last:border-0">
+              <div className="h-4 w-24 bg-gray-300 dark:bg-zinc-700 rounded"></div>
+              <div className="h-4 w-20 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  const CouponsListSkeleton = () => (
+    <div className="space-y-4 animate-pulse">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
+          <div className="flex gap-4">
+            <div className="h-20 w-20 bg-gray-200 dark:bg-zinc-700 rounded-lg flex-shrink-0"></div>
+            <div className="flex-1">
+              <div className="h-5 w-48 bg-gray-300 dark:bg-zinc-700 rounded mb-3"></div>
+              <div className="h-4 w-full bg-gray-200 dark:bg-zinc-800 rounded mb-2"></div>
+              <div className="h-4 w-3/4 bg-gray-200 dark:bg-zinc-800 rounded mb-4"></div>
+              <div className="flex gap-2">
+                <div className="h-6 w-20 bg-gray-200 dark:bg-zinc-700 rounded-full"></div>
+                <div className="h-6 w-24 bg-gray-200 dark:bg-zinc-700 rounded"></div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
+              <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const CouponsStatsSkeleton = () => (
+    <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="rounded-2xl bg-gray-100 dark:bg-zinc-800 p-6">
+          <div className="h-3 w-16 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
+          <div className="h-8 w-12 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
+          <div className="h-3 w-20 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+        </div>
+      ))}
+    </div>
+  )
+
   const renderSection = () => {
     switch (section) {
       case "overview":
@@ -588,12 +731,7 @@ export default function BusinessDashboard() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="text-center">
-                  <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900 dark:border-zinc-700 dark:border-t-white"></div>
-                  <p className="text-sm text-gray-500 dark:text-zinc-400">Loading...</p>
-                </div>
-              </div>
+              <OverviewSkeleton />
             ) : (
               <>
                 {/* Stats Cards */}
@@ -1111,12 +1249,7 @@ export default function BusinessDashboard() {
               </div>
 
             {analyticsLoading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="text-center">
-                  <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900 dark:border-zinc-700 dark:border-t-white"></div>
-                  <p className="text-sm text-gray-500 dark:text-zinc-400">Loading analytics...</p>
-                    </div>
-                    </div>
+              <InsightsSkeleton />
             ) : analytics ? (
               <>
                 {/* Summary Cards */}
@@ -1586,11 +1719,39 @@ export default function BusinessDashboard() {
 
       <main className="ml-0 flex-1 overflow-x-hidden pt-16 lg:ml-72">
         <div className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 lg:px-8">
-          {renderSection()}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={section}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ 
+                duration: 0.3, 
+                ease: [0.4, 0, 0.2, 1] 
+              }}
+            >
+              {renderSection()}
+            </motion.div>
+          </AnimatePresence>
 
-          {section === "coupons" && !loading && (
-            <>
-              {/* Statistics Cards */}
+          <AnimatePresence>
+            {section === "coupons" && (
+              <motion.div
+                key="coupons-extra"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ 
+                  duration: 0.3, 
+                  ease: [0.4, 0, 0.2, 1],
+                  delay: 0.1
+                }}
+              >
+                {loading ? (
+                  <CouponsStatsSkeleton />
+                ) : (
+                  <>
+                    {/* Statistics Cards */}
               <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Total Coupons */}
                 <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-white p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
@@ -1640,6 +1801,8 @@ export default function BusinessDashboard() {
                 </div>
               </div>
             </div>
+                  </>
+                )}
 
             {/* Header with Create Button */}
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2251,12 +2414,7 @@ export default function BusinessDashboard() {
 
         {/* Coupons List */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
-              <p className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</p>
-            </div>
-          </div>
+          <CouponsListSkeleton />
         ) : filteredCoupons.length === 0 ? (
           <div className="rounded-2xl border border-zinc-200 bg-white p-16 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
@@ -2405,8 +2563,9 @@ export default function BusinessDashboard() {
             ))}
           </div>
         )}
-            </>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
     </div>

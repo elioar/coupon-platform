@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import Image from "next/image"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { trackCouponEvent } from "@/lib/analytics"
@@ -51,12 +51,16 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
   const tMembership = useTranslations("membership")
   const { data: session } = useSession()
   const [copied, setCopied] = useState(false)
+  const hasTrackedView = useRef(false)
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
 
-  // Track view when modal opens
+  // Track view when modal opens (only once per modal instance)
+  // Note: We don't track VIEW here since it's already tracked in CouponCard
+  // This prevents double counting when opening the modal
   useEffect(() => {
-    trackCouponEvent(coupon.id, "VIEW", session?.user?.id)
+    // Don't track VIEW in modal - it's already tracked in CouponCard
+    // This prevents duplicate VIEW events
   }, [coupon.id, session?.user?.id])
 
   // Prevent body scroll when modal is open and handle escape key
@@ -77,12 +81,43 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
     }
   }, [onClose])
 
-  const copyCode = () => {
+  const copyCode = async () => {
     if (isMember) {
-      navigator.clipboard.writeText(coupon.code)
-      setCopied(true)
-      trackCouponEvent(coupon.id, "CLICK", session?.user?.id)
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        // Try modern Clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(coupon.code)
+        } else {
+          // Fallback to older method for browsers that don't support Clipboard API
+          const textArea = document.createElement('textarea')
+          textArea.value = coupon.code
+          textArea.style.position = 'fixed'
+          textArea.style.left = '-999999px'
+          textArea.style.top = '-999999px'
+          document.body.appendChild(textArea)
+          textArea.focus()
+          textArea.select()
+          
+          try {
+            document.execCommand('copy')
+          } catch (err) {
+            console.error('Failed to copy using execCommand:', err)
+          }
+          
+          document.body.removeChild(textArea)
+        }
+        
+        setCopied(true)
+        // Track REDEMPTION when member user copies the coupon code
+        trackCouponEvent(coupon.id, "REDEMPTION", session?.user?.id)
+        setTimeout(() => setCopied(false), 2000)
+      } catch (error) {
+        console.error('Failed to copy coupon code:', error)
+        // Still track the redemption even if copy fails
+        trackCouponEvent(coupon.id, "REDEMPTION", session?.user?.id)
+        // Show a message or handle the error gracefully
+        alert('Unable to copy to clipboard. Please copy manually: ' + coupon.code)
+      }
     }
   }
 

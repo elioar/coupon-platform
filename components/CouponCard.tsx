@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import Image from "next/image"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { trackCouponEvent } from "@/lib/analytics"
 
@@ -53,10 +53,75 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
   const t = useTranslations("coupons")
   const { data: session } = useSession()
   const [isHovered, setIsHovered] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+  const hasTrackedView = useRef(false)
 
-  // Track view when component mounts
+  // Check if coupon is saved on mount
   useEffect(() => {
-    trackCouponEvent(coupon.id, "VIEW", session?.user?.id)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('savedCoupons')
+      if (saved) {
+        try {
+          const savedCoupons = JSON.parse(saved)
+          setIsSaved(savedCoupons.includes(coupon.id))
+        } catch (e) {
+          setIsSaved(false)
+        }
+      }
+    }
+  }, [coupon.id])
+
+  // Toggle save/unsave coupon
+  const toggleSave = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering the card click
+    
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('savedCoupons')
+      let savedCoupons: string[] = []
+      
+      if (saved) {
+        try {
+          savedCoupons = JSON.parse(saved)
+        } catch (e) {
+          savedCoupons = []
+        }
+      }
+
+      if (isSaved) {
+        // Remove from saved
+        savedCoupons = savedCoupons.filter(id => id !== coupon.id)
+        setIsSaved(false)
+      } else {
+        // Add to saved
+        savedCoupons.push(coupon.id)
+        setIsSaved(true)
+        // Track SAVE event when user saves a coupon
+        trackCouponEvent(coupon.id, "SAVE", session?.user?.id)
+      }
+
+      localStorage.setItem('savedCoupons', JSON.stringify(savedCoupons))
+      
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('savedCouponsChanged'))
+    }
+  }
+
+  // Track view when component mounts (only once per component instance)
+  useEffect(() => {
+    // Prevent duplicate tracking from React Strict Mode or remounts
+    if (hasTrackedView.current) return
+    
+    // Check sessionStorage to prevent duplicate views within 5 seconds
+    const storageKey = `coupon_view_${coupon.id}`
+    const lastViewTime = sessionStorage.getItem(storageKey)
+    const now = Date.now()
+    
+    // Only track if we haven't tracked this coupon in the last 5 seconds
+    if (!lastViewTime || (now - parseInt(lastViewTime)) > 5000) {
+      hasTrackedView.current = true
+      sessionStorage.setItem(storageKey, now.toString())
+      trackCouponEvent(coupon.id, "VIEW", session?.user?.id)
+    }
   }, [coupon.id, session?.user?.id])
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
@@ -131,9 +196,27 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
             </div>
           </div>
 
-          <h3 className="mb-3 text-xl font-bold text-zinc-900 transition-colors group-hover:text-green-600 dark:text-zinc-50 dark:group-hover:text-green-400">
-            {coupon.title}
-          </h3>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <h3 className="flex-1 text-xl font-bold text-zinc-900 transition-colors group-hover:text-green-600 dark:text-zinc-50 dark:group-hover:text-green-400">
+              {coupon.title}
+            </h3>
+            <button
+              onClick={toggleSave}
+              className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-all hover:bg-zinc-100 hover:text-violet-600 active:scale-95 dark:hover:bg-zinc-800 dark:hover:text-violet-400"
+              aria-label={isSaved ? t("unsaveCoupon") : t("saveCoupon")}
+              title={isSaved ? t("unsaveCoupon") : t("saveCoupon")}
+            >
+              {isSaved ? (
+                <svg className="h-5 w-5 fill-violet-600 text-violet-600 dark:fill-violet-400 dark:text-violet-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              )}
+            </button>
+          </div>
 
           {coupon.business && (
             <p className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
