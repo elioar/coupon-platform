@@ -127,7 +127,12 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
   const numberFormatter = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const integerFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
-  const locationText = coupon.business?.businessLocation || null
+  
+  // Get location and show only first part (before first comma)
+  const fullLocationText = coupon.business?.businessLocation || null
+  const locationText = fullLocationText 
+    ? fullLocationText.split(',')[0].trim()
+    : null
 
   const distanceLabel = (() => {
     if (typeof coupon.distanceKm !== "number") {
@@ -139,6 +144,48 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
     const meters = Math.round(coupon.distanceKm * 1000)
     return t("distanceAwayMeters", { distance: integerFormatter.format(meters) })
   })()
+
+  // Open location in maps (Google Maps or Apple Maps)
+  const openInMaps = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering card click
+    
+    if (!coupon.business) return
+
+    const { businessLocation, businessLatitude, businessLongitude } = coupon.business
+
+    // Detect if user is on iOS (more reliable detection)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+                  /Mac OS X/.test(navigator.userAgent)
+
+    let mapsUrl = ""
+
+    if (businessLatitude && businessLongitude) {
+      // Use coordinates if available (most accurate)
+      if (isIOS) {
+        // Try Apple Maps first, fallback to Google Maps web
+        // Apple Maps URL scheme (opens app if installed, otherwise web)
+        mapsUrl = `https://maps.apple.com/?ll=${businessLatitude},${businessLongitude}&q=${encodeURIComponent(businessLocation || "Location")}`
+      } else {
+        // Google Maps URL
+        mapsUrl = `https://www.google.com/maps?q=${businessLatitude},${businessLongitude}`
+      }
+    } else if (businessLocation) {
+      // Fallback to address if coordinates not available
+      if (isIOS) {
+        // Apple Maps with address
+        mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(businessLocation)}`
+      } else {
+        // Google Maps with address
+        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessLocation)}`
+      }
+    } else {
+      return // No location data available
+    }
+
+    // Open in new tab/window
+    window.open(mapsUrl, "_blank", "noopener,noreferrer")
+  }
 
   return (
     <>
@@ -230,13 +277,24 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
                 {t("locationLabel")}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
-                    <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 1118 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                  <span>{locationText ?? t("locationUnknown")}</span>
-                </div>
+                {locationText && (
+                  <button
+                    onClick={openInMaps}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 transition-all hover:bg-zinc-200 hover:scale-105 active:scale-95 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 cursor-pointer"
+                    title={fullLocationText || locationText} // Show full address on hover
+                  >
+                    <svg className="h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
+                      <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 1118 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    <span className="hover:underline truncate max-w-[120px] sm:max-w-[150px]" title={fullLocationText || locationText}>
+                      {locationText}
+                    </span>
+                    <svg className="h-3 w-3 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">
+                      <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </button>
+                )}
                 {distanceLabel && (
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 shadow-sm dark:bg-green-900/20 dark:text-green-300">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24">

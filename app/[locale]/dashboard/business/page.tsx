@@ -8,6 +8,7 @@ import Link from "next/link"
 import DashboardSidebar from "@/components/DashboardSidebar"
 import DashboardHeader from "@/components/DashboardHeader"
 import Button from "@/components/Button"
+import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
 import { useRouter } from "next/navigation"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -1035,12 +1036,12 @@ export default function BusinessDashboard() {
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">Location</label>
-                      <input 
-                        type="text" 
-                        value={profileData.businessLocation} 
-                        onChange={(e) => setProfileData({ ...profileData, businessLocation: e.target.value })}
+                      <GooglePlacesAutocomplete
+                        value={profileData.businessLocation}
+                        onChange={(value) => setProfileData({ ...profileData, businessLocation: value })}
                         placeholder="e.g., Athens, Greece"
-                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                        locale={locale}
+                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
                       />
                     </div>
                   </div>

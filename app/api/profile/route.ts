@@ -61,17 +61,22 @@ const userSelect = {
 } as const
 
 async function geocodeAddress(address: string, locale: string) {
-  const url = new URL("https://nominatim.openstreetmap.org/search")
-  url.searchParams.set("format", "json")
-  url.searchParams.set("limit", "1")
-  url.searchParams.set("addressdetails", "0")
-  url.searchParams.set("q", address)
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  
+  if (!apiKey) {
+    console.error("GOOGLE_MAPS_API_KEY is not set")
+    throw new Error("Google Maps API key is not configured")
+  }
+
+  // Convert locale to Google Maps language code (e.g., "el" -> "el", "en" -> "en")
+  const language = locale === "el" ? "el" : "en"
+  
+  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json")
+  url.searchParams.set("address", address)
+  url.searchParams.set("key", apiKey)
+  url.searchParams.set("language", language)
 
   const response = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "coupon-platform-profile-geocoder/1.0",
-      "Accept-Language": locale,
-    },
     next: { revalidate: 0 },
   })
 
@@ -79,16 +84,27 @@ async function geocodeAddress(address: string, locale: string) {
     throw new Error("Failed to geocode address")
   }
 
-  const data = (await response.json()) as Array<{ lat: string; lon: string }>
-  if (!data || data.length === 0) {
+  const data = await response.json()
+  
+  // Check for API errors
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    console.error("Google Maps Geocoding API error:", data.status, data.error_message)
+    throw new Error(`Geocoding failed: ${data.status}`)
+  }
+
+  // Handle no results
+  if (data.status === "ZERO_RESULTS" || !data.results || data.results.length === 0) {
     return null
   }
 
-  const result = data[0]
-  const latitude = parseFloat(result.lat)
-  const longitude = parseFloat(result.lon)
+  // Get the first result (most relevant)
+  const result = data.results[0]
+  const location = result.geometry.location
+  
+  const latitude = location.lat
+  const longitude = location.lng
 
-  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
     return null
   }
 

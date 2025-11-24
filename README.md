@@ -63,6 +63,15 @@ A modern, full-stack web platform where users and businesses can register and in
    STRIPE_PUBLISHABLE_KEY="pk_test_..."
    STRIPE_WEBHOOK_SECRET="whsec_..."
 
+   # Google Maps - Get from https://console.cloud.google.com/
+   # Enable these APIs in your Google Cloud project:
+   # 1. Maps JavaScript API (required for Places Autocomplete)
+   # 2. Geocoding API (required for server-side geocoding)
+   # 3. Places API (required for Places Autocomplete)
+   GOOGLE_MAPS_API_KEY="your-google-maps-api-key-here"
+   # Same key for client-side (required for Places Autocomplete)
+   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-maps-api-key-here"
+
    # App
    NEXT_PUBLIC_APP_URL="http://localhost:3000"
    ```

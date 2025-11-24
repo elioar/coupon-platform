@@ -192,7 +192,9 @@
         "previous": "Previous",
         "next": "Next",
         "createAccount": "Create Account",
-        "registerBusiness": "Register Your Business"
+        "registerBusiness": "Register Your Business",
+        "setExactLocation": "Set Your Exact Location",
+        "mapInstructions": "Drag the pin or click on the map to set your exact business location. City and postal code will be filled automatically."
       }
     }
   },
@@ -301,6 +303,7 @@
     "nearMeGpsActive": "GPS tracking active",
     "locationLabel": "Location",
     "locationUnknown": "Location unavailable",
+    "openInMaps": "Open in Maps",
     "distanceAwayKm": "{distance} km away",
     "distanceAwayMeters": "{distance} m away",
     "saveCoupon": "Save coupon",

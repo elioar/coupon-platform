@@ -100,6 +100,65 @@ body {
   animation: float ease-in-out infinite;
 }
 
+/* Google Places Autocomplete styling */
+.pac-container {
+  border-radius: 0.75rem !important;
+  border: 1px solid rgb(229 231 235) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  margin-top: 0.25rem !important;
+  font-family: inherit !important;
+  z-index: 9999 !important;
+}
+
+.dark .pac-container {
+  background-color: rgb(24 24 27) !important;
+  border-color: rgb(39 39 42) !important;
+  color: rgb(244 244 245) !important;
+}
+
+.pac-item {
+  padding: 0.75rem 1rem !important;
+  cursor: pointer !important;
+  border-top: 1px solid rgb(229 231 235) !important;
+  transition: background-color 0.15s ease-in-out !important;
+}
+
+.dark .pac-item {
+  border-top-color: rgb(39 39 42) !important;
+}
+
+.pac-item:hover,
+.pac-item-selected {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .pac-item:hover,
+.dark .pac-item-selected {
+  background-color: rgb(39 39 42) !important;
+}
+
+.pac-item-query {
+  color: rgb(17 24 39) !important;
+  font-size: 0.875rem !important;
+}
+
+.dark .pac-item-query {
+  color: rgb(244 244 245) !important;
+}
+
+.pac-icon {
+  margin-right: 0.5rem !important;
+}
+
+.pac-matched {
+  font-weight: 600 !important;
+  color: rgb(34 197 94) !important;
+}
+
+.dark .pac-matched {
+  color: rgb(74 222 128) !important;
+}
+
 /* Noise texture animation */
 @keyframes noise {
   0%, 100% {

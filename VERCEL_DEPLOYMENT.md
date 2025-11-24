@@ -16,6 +16,10 @@ Make sure to add these environment variables in your Vercel project settings:
 - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key
 - `STRIPE_WEBHOOK_SECRET` - Your Stripe webhook secret (set up webhook in Stripe dashboard)
 
+### Google Maps
+- `GOOGLE_MAPS_API_KEY` - Your Google Maps API key (enable "Geocoding API" in Google Cloud Console)
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` - Same key for client-side (enable "Maps JavaScript API" and "Places API" in Google Cloud Console)
+
 ### App Configuration
 - `NEXT_PUBLIC_APP_URL` - Your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
 

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
 import DashboardSidebar from "@/components/DashboardSidebar"
 import Button from "@/components/Button"
+import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
 
 const formatExpirationDate = (dateString: string, locale: string) => {
   const date = new Date(dateString)
@@ -572,12 +573,11 @@ export default function BusinessDashboard() {
                       <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         {tProfile("businessLocation")}
                       </label>
-                      <input
-                        type="text"
+                      <GooglePlacesAutocomplete
                         value={profileData.businessLocation}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, businessLocation: e.target.value })
-                        }
+                        onChange={(value) => setProfileData({ ...profileData, businessLocation: value })}
+                        placeholder="Enter your business location..."
+                        locale={locale}
                         className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                       />
                     </div>

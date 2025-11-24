@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations, useLocale } from "next-intl"
 import Navigation from "@/components/Navigation"
+import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
 
 interface ProfileResponse {
   profile: {
@@ -452,7 +453,18 @@ export default function ProfilePage() {
                         </p>
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        {renderInput(tProfile("businessLocation"), "businessLocation")}
+                        <div>
+                          <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-white/40">
+                            <span>{tProfile("businessLocation")}</span>
+                          </div>
+                          <GooglePlacesAutocomplete
+                            value={formData.businessLocation}
+                            onChange={(value) => handleChange("businessLocation", value)}
+                            placeholder="Enter your business location..."
+                            locale={locale}
+                            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                          />
+                        </div>
                         {renderInput(tProfile("businessInstagram"), "businessInstagram", {
                           type: "url",
                           placeholder: "https://instagram.com/yourbusiness",
