@@ -337,8 +337,18 @@ export default function CouponsPage() {
     return true
   })
 
+  // Calculate distance for coupons with Google Maps coordinates
   const couponsWithDistance = filteredCoupons.map((coupon) => {
-    if (userLocation && typeof coupon.business?.businessLatitude === "number" && typeof coupon.business.businessLongitude === "number") {
+    // Only calculate distance if we have user location AND business has Google Maps coordinates
+    if (
+      userLocation && 
+      coupon.business?.businessLatitude != null && 
+      coupon.business?.businessLongitude != null &&
+      typeof coupon.business.businessLatitude === "number" && 
+      typeof coupon.business.businessLongitude === "number" &&
+      !isNaN(coupon.business.businessLatitude) &&
+      !isNaN(coupon.business.businessLongitude)
+    ) {
       const distanceKm = calculateDistanceInKm(
         userLocation.lat,
         userLocation.lng,
@@ -352,10 +362,11 @@ export default function CouponsPage() {
 
   const hasDistanceCoupons = couponsWithDistance.some((coupon) => typeof coupon.distanceKm === "number")
 
+  // When "Near Me" is enabled, show only coupons with valid Google Maps coordinates, sorted by distance
   const sortedCoupons =
     nearMeEnabled && userLocation
       ? couponsWithDistance
-          .filter((coupon) => typeof coupon.distanceKm === "number")
+          .filter((coupon) => typeof coupon.distanceKm === "number" && coupon.distanceKm != null)
           .sort((a, b) => (a.distanceKm! - b.distanceKm!))
       : couponsWithDistance
 
