@@ -78,6 +78,12 @@ export async function PATCH(
     if (validatedData.expirationDate) {
       updateData.expirationDate = new Date(validatedData.expirationDate)
     }
+    // Convert empty string to undefined for optional imagePath
+    if (validatedData.imagePath !== undefined) {
+      updateData.imagePath = validatedData.imagePath && validatedData.imagePath.trim() !== '' 
+        ? validatedData.imagePath 
+        : undefined
+    }
 
     const updatedCoupon = await prisma.coupon.update({
       where: { id },

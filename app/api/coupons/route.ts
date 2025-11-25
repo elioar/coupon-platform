@@ -104,13 +104,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createCouponSchema.parse(body)
 
+    // Convert empty string to undefined for optional fields
+    const couponData = {
+      ...validatedData,
+      imagePath: validatedData.imagePath && validatedData.imagePath.trim() !== '' 
+        ? validatedData.imagePath 
+        : undefined,
+      businessId: user.id,
+      expirationDate: new Date(validatedData.expirationDate),
+      status: CouponStatus.PENDING,
+    }
+
     const coupon = await prisma.coupon.create({
-      data: {
-        ...validatedData,
-        businessId: user.id,
-        expirationDate: new Date(validatedData.expirationDate),
-        status: CouponStatus.PENDING,
-      },
+      data: couponData,
       include: {
         business: {
           select: {

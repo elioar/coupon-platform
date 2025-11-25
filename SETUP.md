@@ -65,6 +65,10 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-maps-api-key-here"
 
 # App URL
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Vercel Blob Storage - Get from Vercel Dashboard → Storage → Blob → Create Database
+# Required for image uploads (works in both local dev and production)
+BLOB_READ_WRITE_TOKEN="vercel_blob_rw_your_token_here"
 ```
 
 ### 4. Set Up Stripe
@@ -192,14 +196,14 @@ Error: No signatures found matching the expected signature
 1. Make sure Stripe CLI is running with `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 2. Copy the webhook secret to .env
 
-### Upload Directory Error
+### Image Upload Error
 ```
-ENOENT: no such file or directory, open '.../public/uploads/coupons/...'
+Error uploading file: [Vercel Blob error]
 ```
-**Solution**: Create the directory:
-```bash
-mkdir -p public/uploads/coupons
-```
+**Solution**: 
+1. Make sure `BLOB_READ_WRITE_TOKEN` is set in your `.env` file
+2. Get the token from: Vercel Dashboard → Storage → Blob → Create Database → Copy the token
+3. Restart your development server after adding the token
 
 ## Production Deployment
 
