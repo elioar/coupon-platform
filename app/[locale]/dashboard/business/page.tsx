@@ -180,7 +180,7 @@ export default function BusinessDashboard() {
 
       if (response.ok) {
         const data = await response.json()
-        setFormData({ ...formData, imagePath: data.url })
+        setFormData(prev => ({ ...prev, imagePath: data.url }))
       }
     } catch (error) {
       console.error("Error uploading image:", error)

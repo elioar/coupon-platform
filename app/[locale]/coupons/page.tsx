@@ -365,9 +365,25 @@ export default function CouponsPage() {
   // When "Near Me" is enabled, show only coupons with valid Google Maps coordinates, sorted by distance
   const sortedCoupons =
     nearMeEnabled && userLocation
-      ? couponsWithDistance
-          .filter((coupon) => typeof coupon.distanceKm === "number" && coupon.distanceKm != null)
-          .sort((a, b) => (a.distanceKm! - b.distanceKm!))
+      ? (() => {
+          const withDistance = couponsWithDistance.filter(
+            (coupon) => typeof coupon.distanceKm === "number" && coupon.distanceKm != null
+          )
+          
+          // Debug logging
+          if (process.env.NODE_ENV === "development") {
+            console.log("Near Me Filter:", {
+              totalCoupons: filteredCoupons.length,
+              couponsWithCoordinates: couponsWithDistance.filter(
+                (c) => c.business?.businessLatitude != null && c.business?.businessLongitude != null
+              ).length,
+              couponsWithDistance: withDistance.length,
+              userLocation,
+            })
+          }
+          
+          return withDistance.sort((a, b) => (a.distanceKm! - b.distanceKm!))
+        })()
       : couponsWithDistance
 
   const totalPages = Math.ceil(sortedCoupons.length / itemsPerPage)
@@ -527,7 +543,11 @@ export default function CouponsPage() {
               className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
             >
               <svg className="h-10 w-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                {nearMeEnabled ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                )}
               </svg>
             </motion.div>
             <motion.p
@@ -536,7 +556,12 @@ export default function CouponsPage() {
               transition={{ delay: 0.2 }}
               className="text-xl font-semibold text-zinc-900 dark:text-zinc-50"
             >
-              {searchQuery || selectedCategory ? t("noCouponsFound") : t("noCoupons")}
+              {nearMeEnabled 
+                ? t("noCouponsNearMe") || "No coupons found near you"
+                : searchQuery || selectedCategory 
+                  ? t("noCouponsFound") 
+                  : t("noCoupons")
+              }
             </motion.p>
             <motion.p
               initial={{ opacity: 0, y: 10 }}
@@ -544,7 +569,12 @@ export default function CouponsPage() {
               transition={{ delay: 0.3 }}
               className="mt-2 text-zinc-600 dark:text-zinc-400"
             >
-              {searchQuery || selectedCategory ? t("tryDifferentSearch") : t("checkBackSoon")}
+              {nearMeEnabled
+                ? t("noCouponsNearMeDescription") || "Businesses need to set their location using Google Maps to appear in 'Near Me' results."
+                : searchQuery || selectedCategory 
+                  ? t("tryDifferentSearch") 
+                  : t("checkBackSoon")
+              }
             </motion.p>
           </motion.div>
           ) : (

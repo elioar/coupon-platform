@@ -26,6 +26,11 @@ Make sure to add these environment variables in your Vercel project settings:
 ### Prisma Accelerate (Optional)
 - `PRISMA_ACCELERATE_URL` - Only if you're using Prisma Accelerate. If not set, the app will use direct database connections.
 
+### Vercel Blob Storage
+- `BLOB_READ_WRITE_TOKEN` - Your Vercel Blob storage token (required for image uploads)
+  - Get it from: Vercel Dashboard → Storage → Blob → Create Database → Copy the token
+  - This is required for coupon image uploads to work in production
+
 ## Database Setup
 
 1. **Create a PostgreSQL database** (recommended services):
