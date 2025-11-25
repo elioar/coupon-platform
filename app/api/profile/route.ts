@@ -13,6 +13,8 @@ const profileSchema = z.object({
   businessDescription: z.string().max(2000).optional().nullable(),
   businessCategories: z.array(z.string().max(80)).optional(),
   businessLocation: z.string().max(200).optional().nullable(),
+  businessLatitude: z.number().optional().nullable(),
+  businessLongitude: z.number().optional().nullable(),
   businessWebsite: z
     .string()
     .url()
@@ -167,26 +169,44 @@ export async function PUT(request: NextRequest) {
       businessTikTok: payload.businessTikTok || null,
     }
 
-    const locationForGeocode =
-      payload.businessLocation?.trim() ||
-      payload.address?.trim() ||
-      null
+    // Use provided coordinates if available (from Google Map Picker), otherwise geocode the address
+    let nextLatitude: number | null | undefined = undefined
+    let nextLongitude: number | null | undefined = undefined
 
-    let nextLatitude: number | null | undefined = locationForGeocode ? undefined : null
-    let nextLongitude: number | null | undefined = locationForGeocode ? undefined : null
+    // If coordinates are provided directly (from map picker), use them
+    if (user.role === Role.BUSINESS && payload.businessLatitude != null && payload.businessLongitude != null) {
+      nextLatitude = payload.businessLatitude
+      nextLongitude = payload.businessLongitude
+    } else {
+      // Otherwise, try to geocode the address
+      const locationForGeocode =
+        payload.businessLocation?.trim() ||
+        payload.address?.trim() ||
+        null
 
-    if (user.role === Role.BUSINESS && locationForGeocode) {
-      try {
-        const coordinates = await geocodeAddress(locationForGeocode, preferredLanguage)
-        if (coordinates) {
-          nextLatitude = coordinates.latitude
-          nextLongitude = coordinates.longitude
+      if (locationForGeocode) {
+        try {
+          const coordinates = await geocodeAddress(locationForGeocode, preferredLanguage)
+          if (coordinates) {
+            nextLatitude = coordinates.latitude
+            nextLongitude = coordinates.longitude
+          } else {
+            nextLatitude = null
+            nextLongitude = null
+          }
+        } catch (geocodeError) {
+          console.error("Failed to geocode business location:", geocodeError)
+          nextLatitude = null
+          nextLongitude = null
         }
-      } catch (geocodeError) {
-        console.error("Failed to geocode business location:", geocodeError)
+      } else {
+        // No location provided, clear coordinates
+        nextLatitude = null
+        nextLongitude = null
       }
     }
 
+    // Update coordinates if they were determined
     if (nextLatitude !== undefined && nextLongitude !== undefined) {
       updateData.businessLatitude = nextLatitude
       updateData.businessLongitude = nextLongitude

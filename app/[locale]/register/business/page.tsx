@@ -195,6 +195,8 @@ export default function BusinessRegisterPage() {
         instagram: values.instagram || "",
         facebook: values.facebook || "",
         tiktok: values.tiktok || "",
+        businessLatitude: locationCoordinates?.lat ?? null,
+        businessLongitude: locationCoordinates?.lng ?? null,
       }
 
       const response = await fetch("/api/register", {

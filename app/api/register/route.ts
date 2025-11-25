@@ -28,6 +28,8 @@ const businessSchema = z.object({
   facebook: z.union([z.string().url(), z.literal("")]).optional(),
   tiktok: z.union([z.string().url(), z.literal("")]).optional(),
   logoUrl: z.string().optional().nullable(),
+  businessLatitude: z.number().optional().nullable(),
+  businessLongitude: z.number().optional().nullable(),
 })
 
 const registerSchema = z.discriminatedUnion("role", [userSchema, businessSchema])
@@ -64,6 +66,8 @@ export async function POST(request: NextRequest) {
               ...baseUserData,
               phone: validatedData.phone,
               businessLocation: validatedData.address,
+              businessLatitude: validatedData.businessLatitude ?? null,
+              businessLongitude: validatedData.businessLongitude ?? null,
               businessCategories: [validatedData.categoryId],
               businessWebsite: validatedData.website || null,
               businessInstagram: validatedData.instagram || null,

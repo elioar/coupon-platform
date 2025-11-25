@@ -124,6 +124,8 @@ export default function BusinessDashboard() {
     businessDescription: "",
     businessCategories: "",
     businessLocation: "",
+    businessLatitude: null as number | null,
+    businessLongitude: null as number | null,
     businessWebsite: "",
     businessInstagram: "",
     businessFacebook: "",
@@ -451,6 +453,8 @@ export default function BusinessDashboard() {
           businessDescription: meta.raw,
           businessCategories: profile.businessCategories[0] ?? "",
           businessLocation: profile.businessLocation ?? "",
+          businessLatitude: profile.businessLatitude ?? null,
+          businessLongitude: profile.businessLongitude ?? null,
           businessWebsite: profile.businessWebsite ?? "",
           businessInstagram: profile.businessInstagram ?? "",
           businessFacebook: profile.businessFacebook ?? "",
@@ -511,6 +515,8 @@ export default function BusinessDashboard() {
         }),
         businessCategories: categoriesArray,
         businessLocation: profileData.businessLocation.trim() || null,
+        businessLatitude: profileData.businessLatitude,
+        businessLongitude: profileData.businessLongitude,
         businessWebsite: profileData.businessWebsite.trim() || null,
         businessInstagram: profileData.businessInstagram.trim() || null,
         businessFacebook: profileData.businessFacebook.trim() || null,
@@ -1039,6 +1045,9 @@ export default function BusinessDashboard() {
                       <GooglePlacesAutocomplete
                         value={profileData.businessLocation}
                         onChange={(value) => setProfileData({ ...profileData, businessLocation: value })}
+                        onCoordinatesChange={(lat, lng) => {
+                          setProfileData({ ...profileData, businessLatitude: lat, businessLongitude: lng })
+                        }}
                         placeholder="e.g., Athens, Greece"
                         locale={locale}
                         className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"

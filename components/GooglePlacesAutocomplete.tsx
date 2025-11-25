@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 interface GooglePlacesAutocompleteProps {
   value: string
   onChange: (value: string) => void
+  onCoordinatesChange?: (lat: number, lng: number) => void
   placeholder?: string
   className?: string
   id?: string
@@ -112,6 +113,7 @@ function loadGoogleMapsScript(apiKey: string, locale: string): Promise<void> {
 export default function GooglePlacesAutocomplete({
   value,
   onChange,
+  onCoordinatesChange,
   placeholder = "Enter location...",
   className = "",
   id,
@@ -220,11 +222,26 @@ export default function GooglePlacesAutocomplete({
             if (inputRef.current && inputRef.current.value !== address) {
               inputRef.current.value = address
             }
+          }
+
+          // Extract and pass coordinates if available
+          if (place.geometry?.location && onCoordinatesChange) {
+            const lat = typeof place.geometry.location.lat === 'function' 
+              ? place.geometry.location.lat() 
+              : place.geometry.location.lat
+            const lng = typeof place.geometry.location.lng === 'function' 
+              ? place.geometry.location.lng() 
+              : place.geometry.location.lng
             
-            // Log place details for debugging (can be removed in production)
-            if (process.env.NODE_ENV === "development") {
-              console.log("Selected place:", {
-                address: place.formatted_address,
+            if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+              onCoordinatesChange(lat, lng)
+            }
+          }
+          
+          // Log place details for debugging (can be removed in production)
+          if (process.env.NODE_ENV === "development") {
+            console.log("Selected place:", {
+              address: place.formatted_address,
                 name: place.name,
                 placeId: place.place_id,
                 location: place.geometry?.location,
