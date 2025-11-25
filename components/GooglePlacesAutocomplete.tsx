@@ -242,11 +242,10 @@ export default function GooglePlacesAutocomplete({
           if (process.env.NODE_ENV === "development") {
             console.log("Selected place:", {
               address: place.formatted_address,
-                name: place.name,
-                placeId: place.place_id,
-                location: place.geometry?.location,
-              })
-            }
+              name: place.name,
+              placeId: place.place_id,
+              location: place.geometry?.location,
+            })
           }
         }
       })
