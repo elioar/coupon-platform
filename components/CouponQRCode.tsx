@@ -106,7 +106,6 @@ export default function CouponQRCode({ couponId, onClose }: CouponQRCodeProps) {
                 level="M"
                 bgColor="#FFFFFF"
                 fgColor="#000000"
-                marginSize={2}
               />
             </div>
           )}
