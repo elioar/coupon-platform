@@ -310,7 +310,8 @@
     "unsaveCoupon": "Remove from saved",
     "showQR": "Show QR",
     "qrCode": "QR Code",
-    "qrCodeDescription": "Show this QR code at the store"
+    "qrCodeDescription": "Show this QR code at the store",
+    "showQRCodeAtStore": "Show this QR code at the store to redeem"
   },
   "dashboard": {
     "sidebar": {
@@ -545,6 +546,11 @@
     "title": "Coupon Title",
     "description": "Description",
     "code": "Discount Code",
+    "couponType": "Coupon Type",
+    "onlineCode": "Online Code",
+    "qrCode": "QR Code",
+    "onlineCodeDescription": "For online use - customers will enter a code",
+    "qrCodeDescription": "For in-store use - customers will show a QR code",
     "category": "Category",
     "discountPercentage": "Discount Percentage",
     "expirationDate": "Expiration Date",
@@ -553,7 +559,18 @@
     "update": "Update Coupon",
     "success": "Coupon created successfully!",
     "error": "Failed to create coupon",
-    "uploadImage": "Upload Image"
+    "uploadImage": "Upload Image",
+    "basicInformation": "Basic Information",
+    "basicInformationDescription": "Tell customers about your offer",
+    "couponDetails": "Coupon Details",
+    "couponDetailsDescription": "Set up your discount offer",
+    "imageSectionTitle": "Coupon Image",
+    "imageSectionDescription": "Optional - Make your coupon stand out",
+    "clickToUpload": "Click to upload image",
+    "imageFormats": "JPG, PNG or WebP (max 5MB)",
+    "imageUploaded": "Image uploaded",
+    "readyToUse": "Ready to use",
+    "creating": "Creating..."
   },
   "categories": {
     "fashion": "Fashion",

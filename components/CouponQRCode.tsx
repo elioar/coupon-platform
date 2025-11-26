@@ -1,8 +1,8 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import QRCode from "react-qr-code"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import QRCode from "qrcode"
 
 interface CouponQRCodeProps {
   couponId: string
@@ -11,9 +11,10 @@ interface CouponQRCodeProps {
 
 export default function CouponQRCode({ couponId, onClose }: CouponQRCodeProps) {
   const t = useTranslations("coupons")
-  const [qrData, setQrData] = useState<string | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     // Fetch unique token from API
@@ -30,7 +31,20 @@ export default function CouponQRCode({ couponId, onClose }: CouponQRCodeProps) {
 
         const data = await response.json()
         // QR contains only the token - server will look up all details
-        setQrData(data.token)
+        const token = data.token
+
+        // Generate QR code using qrcode library
+        const dataUrl = await QRCode.toDataURL(token, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF"
+          },
+          errorCorrectionLevel: "M"
+        })
+
+        setQrDataUrl(dataUrl)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error")
       } finally {
@@ -98,14 +112,12 @@ export default function CouponQRCode({ couponId, onClose }: CouponQRCodeProps) {
             </div>
           )}
 
-          {qrData && !loading && !error && (
+          {qrDataUrl && !loading && !error && (
             <div className="flex justify-center rounded-xl bg-white p-6 dark:bg-zinc-800">
-              <QRCode
-                value={qrData}
-                size={300}
-                level="M"
-                bgColor="#FFFFFF"
-                fgColor="#000000"
+              <img 
+                src={qrDataUrl} 
+                alt="QR Code" 
+                className="w-full max-w-[300px] h-auto"
               />
             </div>
           )}
@@ -114,4 +126,3 @@ export default function CouponQRCode({ couponId, onClose }: CouponQRCodeProps) {
     </div>
   )
 }
-

@@ -31,7 +31,8 @@ interface Coupon {
   id: string
   title: string
   description: string
-  code: string
+  code: string | null
+  couponType: "ONLINE_CODE" | "QR_CODE"
   discountPercentage: number
   expirationDate: string
   status: string
@@ -110,6 +111,7 @@ export default function BusinessDashboard() {
     title: "",
     description: "",
     code: "",
+    couponType: "ONLINE_CODE" as "ONLINE_CODE" | "QR_CODE",
     categoryId: "",
     discountPercentage: 10,
     expirationDate: "",
@@ -206,10 +208,13 @@ export default function BusinessDashboard() {
       errors.description = 'Description must be at least 10 characters'
     }
 
-    if (!formData.code || formData.code.trim() === '') {
-      errors.code = 'Coupon code is required'
-    } else if (formData.code.trim().length < 2) {
-      errors.code = 'Coupon code must be at least 2 characters'
+    // Code is only required for ONLINE_CODE type
+    if (formData.couponType === 'ONLINE_CODE') {
+      if (!formData.code || formData.code.trim() === '') {
+        errors.code = 'Coupon code is required for online coupons'
+      } else if (formData.code.trim().length < 2) {
+        errors.code = 'Coupon code must be at least 2 characters'
+      }
     }
 
     if (!formData.categoryId || formData.categoryId === '') {
@@ -271,6 +276,7 @@ export default function BusinessDashboard() {
           title: "",
           description: "",
           code: "",
+          couponType: "ONLINE_CODE",
           categoryId: "",
           discountPercentage: 10,
           expirationDate: "",
@@ -278,7 +284,9 @@ export default function BusinessDashboard() {
         })
         setMessage({ type: 'success', text: 'Coupon created successfully! Waiting for admin approval.' })
       } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to create coupon' })
+        console.error("Coupon creation error:", data)
+        const errorMessage = data.error || data.details?.[0]?.message || 'Failed to create coupon'
+        setMessage({ type: 'error', text: errorMessage })
       }
     } catch (error) {
       console.error("Error creating coupon:", error)
@@ -294,7 +302,8 @@ export default function BusinessDashboard() {
     setFormData({
       title: coupon.title,
       description: coupon.description,
-      code: coupon.code,
+      code: coupon.code || "",
+      couponType: coupon.couponType || "ONLINE_CODE",
       categoryId: coupon.category.id,
       discountPercentage: coupon.discountPercentage,
       expirationDate: coupon.expirationDate.split('T')[0],
@@ -331,6 +340,7 @@ export default function BusinessDashboard() {
           title: "",
           description: "",
           code: "",
+          couponType: "ONLINE_CODE",
           categoryId: "",
           discountPercentage: 10,
           expirationDate: "",
@@ -406,7 +416,7 @@ export default function BusinessDashboard() {
     }
   }
 
-  const handleQRScan = async (token: string) => {
+  const handleQRScan = async (token: string): Promise<{ success: boolean; message?: string; error?: string; isAlreadyRedeemed?: boolean }> => {
     try {
       const response = await fetch(`/api/coupons/redeem`, {
         method: "POST",
@@ -414,21 +424,82 @@ export default function BusinessDashboard() {
         body: JSON.stringify({ redemptionToken: token })
       })
 
-      const result = await response.json()
+      let result
+      try {
+        result = await response.json()
+      } catch (jsonError) {
+        // If response is not JSON, create error object
+        console.error("Failed to parse JSON response:", jsonError)
+        const errorMessage = response.statusText || "Unknown error"
+        setMessage({ 
+          type: "error", 
+          text: `✗ ${errorMessage}` 
+        })
+        setTimeout(() => setMessage(null), 5000)
+        return {
+          success: false,
+          error: errorMessage,
+          message: `HTTP ${response.status}: ${errorMessage}`
+        }
+      }
 
-      if (result.valid) {
+      // Check if response is successful (200) and valid
+      if (response.ok && result.valid === true) {
+        const messageText = `✓ ${result.message || "Coupon redeemed successfully"}\n\n${t("user") || "User"}: ${result.user?.name || "N/A"}`
         setMessage({ 
           type: "success", 
-          text: `${result.message}\n${t("user") || "User"}: ${result.user.name}` 
+          text: messageText
         })
+        setTimeout(() => setMessage(null), 5000)
+        
+        return {
+          success: true,
+          message: result.message || "Coupon redeemed successfully"
+        }
       } else {
-        setMessage({ type: "error", text: result.message || result.error })
+        // Handle error response - check if already redeemed
+        const errorMsg = result.message || result.error || "Invalid coupon"
+        const errorLower = errorMsg.toLowerCase()
+        const isAlreadyRedeemed = 
+          errorLower.includes("already") || 
+          errorLower.includes("redeemed") ||
+          errorLower.includes("γίνει redeem") ||
+          errorLower.includes("ήδη") ||
+          result.redeemedAt !== undefined ||
+          (result.error && result.error.toLowerCase().includes("already"))
+        
+        console.log("Redemption error:", { errorMsg, isAlreadyRedeemed, result, status: response.status })
+        
+        const messageText = isAlreadyRedeemed 
+          ? `⚠ Already Redeemed\n\nThis coupon was used before.` 
+          : `✗ ${errorMsg}`
+        
+        setMessage({ 
+          type: "error", 
+          text: messageText
+        })
+        setTimeout(() => setMessage(null), 5000)
+        
+        return {
+          success: false,
+          error: errorMsg,
+          message: errorMsg,
+          isAlreadyRedeemed
+        }
       }
     } catch (error) {
-      setMessage({ type: "error", text: t("qrScanError") || "Σφάλμα κατά την επικύρωση QR code" })
-    } finally {
-      setShowQRScanner(false)
+      console.error("QR Scan Error:", error)
+      const errorMessage = t("qrScanError") || "Error validating QR code"
+      setMessage({ 
+        type: "error", 
+        text: `✗ ${errorMessage}` 
+      })
       setTimeout(() => setMessage(null), 5000)
+      
+      return {
+        success: false,
+        error: errorMessage
+      }
     }
   }
 
@@ -438,6 +509,7 @@ export default function BusinessDashboard() {
       title: "",
       description: "",
       code: "",
+      couponType: "ONLINE_CODE",
       categoryId: "",
       discountPercentage: 10,
       expirationDate: "",
@@ -1009,26 +1081,28 @@ export default function BusinessDashboard() {
 
             {/* Message */}
             {message && section === "profile" && (
-              <div className={`rounded-2xl border p-4 shadow-sm ${
+              <div className={`animate-in slide-in-from-top-2 fade-in duration-300 rounded-xl border-2 p-4 shadow-lg ${
                   message.type === 'success' 
-                  ? 'border-green-200/50 bg-gradient-to-br from-green-50 to-green-50/50 text-green-800 dark:border-green-800/50 dark:from-green-900/30 dark:to-green-900/20 dark:text-green-300'
-                  : 'border-red-200/50 bg-gradient-to-br from-red-50 to-red-50/50 text-red-800 dark:border-red-800/50 dark:from-red-900/30 dark:to-red-900/20 dark:text-red-300'
+                  ? 'border-green-300/50 bg-gradient-to-br from-green-50 via-green-50/80 to-emerald-50 text-green-900 dark:border-green-700/50 dark:from-green-900/40 dark:via-green-900/30 dark:to-emerald-900/40 dark:text-green-200 shadow-green-500/10'
+                  : 'border-red-300/50 bg-gradient-to-br from-red-50 via-red-50/80 to-rose-50 text-red-900 dark:border-red-700/50 dark:from-red-900/40 dark:via-red-900/30 dark:to-rose-900/40 dark:text-red-200 shadow-red-500/10'
                 }`}>
                 <div className="flex items-start gap-3">
                     {message.type === 'success' ? (
-                    <div className="flex-shrink-0 rounded-full bg-green-100 p-1 dark:bg-green-900/50">
-                      <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div className="flex-shrink-0 rounded-full bg-green-500 p-2 shadow-md shadow-green-500/30 animate-in zoom-in duration-300">
+                      <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
                     ) : (
-                    <div className="flex-shrink-0 rounded-full bg-red-100 p-1 dark:bg-red-900/50">
-                      <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                        <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div className="flex-shrink-0 rounded-full bg-red-500 p-2 shadow-md shadow-red-500/30 animate-in zoom-in duration-300">
+                      <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </div>
                     )}
-                  <p className="text-sm font-medium flex-1 leading-relaxed">{message.text}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold leading-relaxed whitespace-pre-line break-words">{message.text}</p>
+                  </div>
                   </div>
                 </div>
               )}
@@ -1927,50 +2001,62 @@ export default function BusinessDashboard() {
               </div>
 
                   {/* Form Content - Scrollable */}
-                  <div className="flex-1 overflow-y-auto overscroll-contain">
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6">
                     {/* Error/Success Message */}
-              {message && (
-                      <div className={`mx-4 sm:mx-6 mt-4 sm:mt-6 rounded-2xl border p-4 shadow-sm ${
-                  message.type === 'success' 
-                          ? 'border-green-200/50 bg-gradient-to-br from-green-50 to-green-50/50 text-green-800 dark:border-green-800/50 dark:from-green-900/30 dark:to-green-900/20 dark:text-green-300'
-                          : 'border-red-200/50 bg-gradient-to-br from-red-50 to-red-50/50 text-red-800 dark:border-red-800/50 dark:from-red-900/30 dark:to-red-900/20 dark:text-red-300'
-                }`}>
+                    {message && (
+                      <div className={`mb-6 animate-in slide-in-from-top-2 fade-in duration-300 rounded-xl border-2 p-4 ${
+                        message.type === 'success' 
+                          ? 'border-green-300 bg-green-50 text-green-900 dark:border-green-700 dark:bg-green-900/30 dark:text-green-200'
+                          : 'border-orange-300 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-200'
+                      }`}>
                         <div className="flex items-start gap-3">
-                    {message.type === 'success' ? (
-                            <div className="flex-shrink-0 rounded-full bg-green-100 p-1 dark:bg-green-900/50">
-                              <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                    ) : (
-                            <div className="flex-shrink-0 rounded-full bg-red-100 p-1 dark:bg-red-900/50">
-                              <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                    )}
-                          <p className="text-sm font-medium flex-1 leading-relaxed">{message.text}</p>
-              </div>
-            </div>
-              )}
-
-                    <form id="create-coupon-form" onSubmit={handleSubmit} className="p-4 sm:p-6">
-                      {/* Basic Information Section */}
-                      <div className="mb-6 sm:mb-8">
-                        <div className="mb-4 flex items-center gap-2">
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
-                          <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500 px-2">Basic Information</h4>
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
+                          {message.type === 'success' ? (
+                            <div className="flex-shrink-0 rounded-full bg-green-500 p-2">
+                              <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="flex-shrink-0 rounded-full bg-orange-500 p-2">
+                              <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold leading-relaxed whitespace-pre-line break-words">{message.text}</p>
+                          </div>
+                        </div>
                       </div>
-                        <div className="space-y-4 sm:space-y-5">
-              <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                    )}
+
+                    <form id="create-coupon-form" onSubmit={handleSubmit} className="space-y-6">
+                      {/* Basic Information Card */}
+                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600">
+                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("basicInformation")}</h3>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("basicInformationDescription")}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-5">
+                          <div>
+                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              </svg>
                               {tCouponForm("title")} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={formData.title}
                               onChange={(e) => {
                                 setFormData({ ...formData, title: e.target.value })
                                 if (formErrors.title) {
@@ -1978,141 +2064,240 @@ export default function BusinessDashboard() {
                                 }
                               }}
                               placeholder="e.g., Summer Sale 2024"
-                              className={`block w-full rounded-2xl border-0 px-4 py-3.5 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 touch-manipulation ${
+                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.title 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                                  : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
                             />
                             {formErrors.title && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {formErrors.title}
                               </p>
                             )}
-              </div>
+                          </div>
 
-              <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <div>
+                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                              </svg>
                               {tCouponForm("description")} <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  required
+                            </label>
+                            <textarea
+                              required
                               rows={4}
-                  value={formData.description}
+                              value={formData.description}
                               onChange={(e) => {
                                 setFormData({ ...formData, description: e.target.value })
                                 if (formErrors.description) {
                                   setFormErrors({ ...formErrors, description: undefined })
                                 }
                               }}
-                              placeholder="Describe your coupon offer in detail..."
-                              className={`block w-full rounded-2xl border-0 px-4 py-3.5 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none touch-manipulation ${
+                              placeholder="Describe your coupon offer in detail. What makes it special?"
+                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none ${
                                 formErrors.description 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                                  : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
                             />
                             {formErrors.description && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                                </svg>
                                 {formErrors.description}
                               </p>
                             )}
                           </div>
                         </div>
-              </div>
+                      </div>
 
-                      {/* Coupon Details Section */}
-                      <div className="mb-6 sm:mb-8">
-                        <div className="mb-4 flex items-center gap-2">
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
-                          <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500 px-2">Coupon Details</h4>
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
+                      {/* Coupon Details Card */}
+                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("couponDetails")}</h3>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("couponDetailsDescription")}</p>
+                          </div>
                         </div>
-                        <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
-                <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              {tCouponForm("code")} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.code}
-                              onChange={(e) => {
-                                setFormData({ ...formData, code: e.target.value })
+
+                        {/* Coupon Type Selection */}
+                        <div className="mb-6">
+                          <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                            <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            {tCouponForm("couponType")} <span className="text-red-500">*</span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, couponType: "ONLINE_CODE" })
                                 if (formErrors.code) {
                                   setFormErrors({ ...formErrors, code: undefined })
                                 }
                               }}
-                              placeholder="SAVE20"
-                              className={`block w-full rounded-2xl border-0 px-4 py-3.5 text-base font-semibold text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 touch-manipulation ${
-                                formErrors.code 
-                                  ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                              className={`group relative rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                                formData.couponType === "ONLINE_CODE"
+                                  ? "border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 text-violet-700 shadow-md shadow-violet-500/10 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20 dark:text-violet-300"
+                                  : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:bg-violet-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
                               }`}
-                            />
-                            {formErrors.code && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            >
+                              <div className="flex flex-col items-center gap-2">
+                                <svg className={`h-6 w-6 transition-transform ${formData.couponType === "ONLINE_CODE" ? "scale-110" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                                 </svg>
-                                {formErrors.code}
-                              </p>
-                            )}
-                </div>
+                                <span>{tCouponForm("onlineCode")}</span>
+                              </div>
+                              {formData.couponType === "ONLINE_CODE" && (
+                                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600">
+                                  <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, couponType: "QR_CODE", code: "" })
+                                if (formErrors.code) {
+                                  setFormErrors({ ...formErrors, code: undefined })
+                                }
+                              }}
+                              className={`group relative rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                                formData.couponType === "QR_CODE"
+                                  ? "border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 text-violet-700 shadow-md shadow-violet-500/10 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20 dark:text-violet-300"
+                                  : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:bg-violet-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
+                              }`}
+                            >
+                              <div className="flex flex-col items-center gap-2">
+                                <svg className={`h-6 w-6 transition-transform ${formData.couponType === "QR_CODE" ? "scale-110" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <span>{tCouponForm("qrCode")}</span>
+                              </div>
+                              {formData.couponType === "QR_CODE" && (
+                                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600">
+                                  <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              )}
+                            </button>
+                          </div>
+                          <div className="mt-3 rounded-lg bg-violet-50/50 p-3 dark:bg-violet-900/10">
+                            <p className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400">
+                              <svg className="h-4 w-4 flex-shrink-0 text-violet-600 dark:text-violet-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>{formData.couponType === "ONLINE_CODE" 
+                                ? tCouponForm("onlineCodeDescription")
+                                : tCouponForm("qrCodeDescription")}</span>
+                            </p>
+                          </div>
+                        </div>
 
-                <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          {formData.couponType === "ONLINE_CODE" && (
+                            <div>
+                              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                </svg>
+                                {tCouponForm("code")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required={formData.couponType === "ONLINE_CODE"}
+                                value={formData.code}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, code: e.target.value })
+                                  if (formErrors.code) {
+                                    setFormErrors({ ...formErrors, code: undefined })
+                                  }
+                                }}
+                                placeholder="SAVE20"
+                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base font-semibold text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                  formErrors.code 
+                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                                    : 'bg-gray-50 dark:bg-zinc-800/50'
+                                }`}
+                              />
+                              {formErrors.code && (
+                                <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                  <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  {formErrors.code}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              </svg>
                               {tCouponForm("category")} <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.categoryId}
+                            </label>
+                            <select
+                              required
+                              value={formData.categoryId}
                               onChange={(e) => {
                                 setFormData({ ...formData, categoryId: e.target.value })
                                 if (formErrors.categoryId) {
                                   setFormErrors({ ...formErrors, categoryId: undefined })
                                 }
                               }}
-                              className={`block w-full rounded-2xl border-0 px-4 py-3.5 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 touch-manipulation appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
+                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
                                 formErrors.categoryId 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                                  : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {locale === "el" ? category.nameEl : category.nameEn}
-                      </option>
-                    ))}
-                  </select>
+                            >
+                              <option value="">Select category</option>
+                              {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {locale === "el" ? category.nameEl : category.nameEn}
+                                </option>
+                              ))}
+                            </select>
                             {formErrors.categoryId && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {formErrors.categoryId}
                               </p>
                             )}
-              </div>
+                          </div>
 
-                <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <div>
+                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
-                  </label>
-                        <div className="relative">
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max="100"
-                    value={formData.discountPercentage}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                required
+                                min="1"
+                                max="100"
+                                value={formData.discountPercentage}
                                 onChange={(e) => {
                                   setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || 0 })
                                   if (formErrors.discountPercentage) {
@@ -2120,32 +2305,35 @@ export default function BusinessDashboard() {
                                   }
                                 }}
                                 placeholder="20"
-                                className={`block w-full rounded-2xl border-0 px-4 py-3.5 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 touch-manipulation ${
+                                className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                   formErrors.discountPercentage 
                                     ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                    : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                                    : 'bg-gray-50 dark:bg-zinc-800/50'
                                 }`}
                               />
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-base font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
-                        </div>
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
+                            </div>
                             {formErrors.discountPercentage && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                                </svg>
                                 {formErrors.discountPercentage}
                               </p>
                             )}
-                </div>
+                          </div>
 
-                <div>
-                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <div>
+                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
                               {tCouponForm("expirationDate")} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.expirationDate}
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={formData.expirationDate}
                               onChange={(e) => {
                                 setFormData({ ...formData, expirationDate: e.target.value })
                                 if (formErrors.expirationDate) {
@@ -2153,86 +2341,107 @@ export default function BusinessDashboard() {
                                 }
                               }}
                               min={new Date().toISOString().split('T')[0]}
-                              className={`block w-full rounded-2xl border-0 px-4 py-3.5 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 touch-manipulation ${
+                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.expirationDate 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50/80 dark:bg-zinc-800/50'
+                                  : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
                             />
                             {formErrors.expirationDate && (
-                              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                                </svg>
                                 {formErrors.expirationDate}
                               </p>
                             )}
                           </div>
-                </div>
-              </div>
-
-                      {/* Image Upload Section */}
-              <div>
-                        <div className="mb-4 flex items-center gap-2">
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
-                          <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500 px-2">Image (Optional)</h4>
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-zinc-700"></div>
-                          </div>
-                        <div className="space-y-3">
-                          <div className="relative">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                              className="block w-full text-sm text-gray-900 file:mr-4 file:rounded-2xl file:border-0 file:bg-gradient-to-r file:from-violet-500 file:to-violet-600 file:px-5 file:py-3 file:text-sm file:font-semibold file:text-white file:shadow-lg file:shadow-violet-500/25 transition hover:file:from-violet-600 hover:file:to-violet-700 active:file:scale-95 dark:text-zinc-100 touch-manipulation"
-                />
-                {uploadingImage && (
-                              <div className="mt-3 flex items-center gap-2.5 rounded-2xl bg-violet-50/50 px-4 py-3 dark:bg-violet-900/20">
-                                <svg className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                                <span className="text-sm font-medium text-violet-700 dark:text-violet-300">{tCommon("loading")}...</span>
+                        </div>
                       </div>
-                    )}
-                </div>
-                {formData.imagePath && (
-                            <div className="group rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm transition hover:shadow-md dark:border-zinc-700 dark:from-zinc-800/50 dark:to-zinc-800/30">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="relative flex-shrink-0">
-                    <img
-                      src={formData.imagePath}
-                      alt="Preview"
-                                      className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover ring-2 ring-gray-200 dark:ring-zinc-700"
+
+                      {/* Image Upload Card */}
+                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
+                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("imageSectionTitle")}</h3>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("imageSectionDescription")}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          {!formData.imagePath ? (
+                            <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8 transition-all hover:border-violet-400 hover:bg-violet-50/30 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={handleImageUpload}
+                                disabled={uploadingImage}
+                                className="hidden"
+                              />
+                              {uploadingImage ? (
+                                <div className="flex flex-col items-center gap-3">
+                                  <svg className="h-12 w-12 animate-spin text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                  <span className="text-sm font-medium text-violet-700 dark:text-violet-300">{tCommon("loading")}...</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
+                                    <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                  </div>
+                                  <p className="mb-1 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                                    {tCouponForm("clickToUpload")}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                    {tCouponForm("imageFormats")}
+                                  </p>
+                                </>
+                              )}
+                            </label>
+                          ) : (
+                            <div className="group relative overflow-hidden rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:from-zinc-800/50 dark:to-zinc-800/30">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                  <div className="relative flex-shrink-0 overflow-hidden rounded-lg">
+                                    <img
+                                      src={formData.imagePath}
+                                      alt="Preview"
+                                      className="h-20 w-20 object-cover ring-2 ring-gray-200 dark:ring-zinc-700"
                                     />
-                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </div>
+                                  </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Image uploaded</p>
-                                    <p className="text-xs text-gray-500 dark:text-zinc-400">Tap to preview</p>
-                  </div>
-                    </div>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{tCouponForm("imageUploaded")}</p>
+                                    <p className="text-xs text-gray-500 dark:text-zinc-400">{tCouponForm("readyToUse")}</p>
+                                  </div>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => setFormData({ ...formData, imagePath: "" })}
-                                  className="flex-shrink-0 rounded-xl p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/20 dark:hover:text-red-400 touch-manipulation"
+                                  className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                                 >
-                                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                     <path d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                                  </svg>
                                 </button>
-              </div>
-                  </div>
-                )}
-              </div>
-                    </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
             </form>
           </div>
 
                   {/* Footer with Actions */}
-                  <div className="sticky bottom-0 flex flex-col gap-3 border-t border-gray-200/50 bg-gradient-to-b from-white via-white to-gray-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-5 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-900/50 backdrop-blur-sm">
+                  <div className="sticky bottom-0 flex flex-col gap-3 border-t border-gray-200/50 bg-white/95 backdrop-blur-sm px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-5 dark:border-zinc-800 dark:bg-zinc-900/95">
                     <p className="hidden text-xs font-medium text-gray-500 dark:text-zinc-400 sm:block">
                       <span className="text-red-500">*</span> Required fields
                     </p>
@@ -2240,35 +2449,35 @@ export default function BusinessDashboard() {
                       <button
                         type="button"
                         onClick={() => setShowForm(false)}
-                        className="w-full rounded-2xl border-2 border-gray-300 bg-white px-5 py-3.5 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:border-zinc-600 touch-manipulation sm:w-auto"
+                        className="w-full rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:border-zinc-600 sm:w-auto"
                       >
-                        Cancel
+                        {tCommon("cancel")}
                       </button>
                       <button
                         type="submit"
                         form="create-coupon-form"
                         disabled={submitting || uploadingImage}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700 touch-manipulation sm:w-auto"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700 sm:w-auto"
                       >
                         {submitting ? (
                           <>
                             <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                            <span>Creating...</span>
+                            </svg>
+                            <span>{tCouponForm("creating")}</span>
                           </>
                         ) : (
                           <>
                             <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                               <path d="M5 13l4 4L19 7" />
-                </svg>
+                            </svg>
                             <span>{tCouponForm("submit")}</span>
                           </>
-              )}
+                        )}
                       </button>
-            </div>
-          </div>
+                    </div>
+                  </div>
                 </div>
           </div>
         )}
@@ -2337,20 +2546,72 @@ export default function BusinessDashboard() {
                 />
               </div>
 
+              {/* Coupon Type Selection */}
+              <div className="mb-4">
+                <label className="mb-3 block text-sm font-medium text-gray-700 dark:text-zinc-300">
+                  {tCouponForm("couponType")} <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, couponType: "ONLINE_CODE" })
+                    }}
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                      formData.couponType === "ONLINE_CODE"
+                        ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      {tCouponForm("onlineCode")}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, couponType: "QR_CODE", code: "" })
+                    }}
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                      formData.couponType === "QR_CODE"
+                        ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                      </svg>
+                      {tCouponForm("qrCode")}
+                    </div>
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">
+                  {formData.couponType === "ONLINE_CODE" 
+                    ? tCouponForm("onlineCodeDescription")
+                    : tCouponForm("qrCodeDescription")}
+                </p>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
+                {formData.couponType === "ONLINE_CODE" && (
                 <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
                         {tCouponForm("code")} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    required
+                    required={formData.couponType === "ONLINE_CODE"}
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                         placeholder="SAVE20"
                         className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                   />
                 </div>
+                )}
 
                 <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
@@ -2635,18 +2896,24 @@ export default function BusinessDashboard() {
       {showQRScanner && (
         <QRScanner 
           onScanSuccess={handleQRScan} 
-          onClose={() => setShowQRScanner(false)} 
+          onClose={() => {
+            setShowQRScanner(false)
+            setMessage(null)
+          }}
+          onRedemptionError={(errorMessage: string) => {
+            // This will be handled by the QRScanner component internally
+          }}
         />
       )}
 
       {/* Floating QR Scanner Button - Always visible */}
       <button
         onClick={() => setShowQRScanner(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 p-3 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl dark:from-indigo-500 dark:to-purple-500"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-indigo-600 p-2.5 sm:p-3 text-white shadow-lg transition hover:bg-indigo-700 hover:scale-105 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600 touch-manipulation"
         title={t("scanQRButton") || "Scan QR Code"}
         aria-label={t("scanQRButton") || "Scan QR Code"}
       >
-        <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
           <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
         </svg>
       </button>

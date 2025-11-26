@@ -12,7 +12,8 @@ interface Coupon {
   id: string
   title: string
   description: string
-  code: string
+  code: string | null
+  couponType: "ONLINE_CODE" | "QR_CODE"
   imagePath: string | null
   discountPercentage: number
   expirationDate: string
@@ -84,7 +85,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
   }, [onClose])
 
   const copyCode = async () => {
-    if (isMember) {
+    if (isMember && coupon.code) {
       try {
         // Try modern Clipboard API first
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -211,25 +212,33 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
             {coupon.description}
           </p>
 
-          {/* Code Section */}
+          {/* Code/QR Section */}
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/50">
             <h3 className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              {t("code")}
+              {coupon.couponType === "QR_CODE" ? t("qrCode") : t("code")}
             </h3>
 
             {isMember ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-green-300 bg-white p-4 dark:border-green-700 dark:bg-zinc-900">
-                  <code className="text-xl font-bold tracking-wider text-green-700 dark:text-green-300">
-                    {coupon.code}
-                  </code>
-                  <div className="flex gap-2">
+                {coupon.couponType === "QR_CODE" ? (
+                  // Show QR Code automatically for QR-type coupons
+                  <div className="flex flex-col items-center gap-4 rounded-lg border-2 border-dashed border-green-300 bg-white p-6 dark:border-green-700 dark:bg-zinc-900">
                     <button
                       onClick={() => setShowQR(true)}
-                      className="shrink-0 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-indigo-700 hover:scale-105 active:scale-95"
+                      className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-indigo-700 hover:scale-105 active:scale-95"
                     >
                       {t("showQR")}
                     </button>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 text-center">
+                      {t("showQRCodeAtStore")}
+                    </p>
+                  </div>
+                ) : (
+                  // Show code for ONLINE_CODE type (only code, no QR)
+                  <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-green-300 bg-white p-4 dark:border-green-700 dark:bg-zinc-900">
+                    <code className="text-xl font-bold tracking-wider text-green-700 dark:text-green-300">
+                      {coupon.code}
+                    </code>
                     <button
                       onClick={copyCode}
                       className="shrink-0 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95"
@@ -237,13 +246,19 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
                       {copied ? t("copiedCode") : t("copyCode")}
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="text-center">
                 <div className="mb-4 rounded-lg border-2 border-dashed border-zinc-300 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
                   <div className="blur-sm">
-                    <code className="text-xl font-bold tracking-wider text-zinc-400">XXXXXXXX</code>
+                    {coupon.couponType === "QR_CODE" ? (
+                      <div className="flex items-center justify-center">
+                        <div className="h-32 w-32 bg-zinc-300 dark:bg-zinc-700 rounded"></div>
+                      </div>
+                    ) : (
+                      <code className="text-xl font-bold tracking-wider text-zinc-400">XXXXXXXX</code>
+                    )}
                   </div>
                 </div>
                 <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
@@ -261,7 +276,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
         </div>
       </div>
 
-      {showQR && (
+      {showQR && coupon.couponType === "QR_CODE" && (
         <CouponQRCode couponId={coupon.id} onClose={() => setShowQR(false)} />
       )}
     </div>

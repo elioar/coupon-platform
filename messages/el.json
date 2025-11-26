@@ -310,7 +310,8 @@
     "unsaveCoupon": "Αφαίρεση από αποθηκευμένα",
     "showQR": "Εμφάνιση QR",
     "qrCode": "QR Code",
-    "qrCodeDescription": "Δείξτε αυτό το QR code στο κατάστημα"
+    "qrCodeDescription": "Δείξτε αυτό το QR code στο κατάστημα",
+    "showQRCodeAtStore": "Δείξτε αυτό το QR code στο κατάστημα για εξαργύρωση"
   },
   "dashboard": {
     "sidebar": {
@@ -544,6 +545,11 @@
     "title": "Τίτλος Κουπονιού",
     "description": "Περιγραφή",
     "code": "Κωδικός Έκπτωσης",
+    "couponType": "Τύπος Κουπονιού",
+    "onlineCode": "Κωδικός Online",
+    "qrCode": "QR Code",
+    "onlineCodeDescription": "Για online χρήση - οι πελάτες θα εισάγουν έναν κωδικό",
+    "qrCodeDescription": "Για χρήση στο κατάστημα - οι πελάτες θα δείξουν ένα QR code",
     "category": "Κατηγορία",
     "discountPercentage": "Ποσοστό Έκπτωσης",
     "expirationDate": "Ημερομηνία Λήξης",
@@ -552,7 +558,18 @@
     "update": "Ενημέρωση Κουπονιού",
     "success": "Το κουπόνι δημιουργήθηκε επιτυχώς!",
     "error": "Αποτυχία δημιουργίας κουπονιού",
-    "uploadImage": "Μεταφόρτωση Εικόνας"
+    "uploadImage": "Μεταφόρτωση Εικόνας",
+    "basicInformation": "Βασικές Πληροφορίες",
+    "basicInformationDescription": "Πείτε στους πελάτες για την προσφορά σας",
+    "couponDetails": "Λεπτομέρειες Κουπονιού",
+    "couponDetailsDescription": "Ρυθμίστε την προσφορά έκπτωσης σας",
+    "imageSectionTitle": "Εικόνα Κουπονιού",
+    "imageSectionDescription": "Προαιρετικό - Κάντε το κουπόνι σας να ξεχωρίζει",
+    "clickToUpload": "Κάντε κλικ για μεταφόρτωση εικόνας",
+    "imageFormats": "JPG, PNG ή WebP (μέγιστο 5MB)",
+    "imageUploaded": "Η εικόνα μεταφορτώθηκε",
+    "readyToUse": "Έτοιμο για χρήση",
+    "creating": "Δημιουργία..."
   },
   "categories": {
     "fashion": "Μόδα",

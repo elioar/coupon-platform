@@ -2,16 +2,30 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
+import { CouponType } from "@prisma/client"
 
 const updateCouponSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().min(10).optional(),
-  code: z.string().min(3).max(50).optional(),
+  code: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.string().min(3).max(50).optional()
+  ),
+  couponType: z.nativeEnum(CouponType).optional(),
   categoryId: z.string().optional(),
   discountPercentage: z.number().min(1).max(100).optional(),
   expirationDate: z.string().datetime().optional(),
   imagePath: z.string().optional(),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+}).refine((data) => {
+  // If couponType is ONLINE_CODE, code is required
+  if (data.couponType === CouponType.ONLINE_CODE && data.code !== undefined) {
+    return data.code && data.code.trim().length >= 3
+  }
+  return true
+}, {
+  message: "Code is required for online coupons",
+  path: ["code"]
 })
 
 // GET - Get single coupon
@@ -78,10 +92,25 @@ export async function PATCH(
     if (validatedData.expirationDate) {
       updateData.expirationDate = new Date(validatedData.expirationDate)
     }
+    // Handle code based on couponType
+    if (validatedData.couponType !== undefined) {
+      if (validatedData.couponType === CouponType.QR_CODE) {
+        updateData.code = undefined
+      } else if (validatedData.couponType === CouponType.ONLINE_CODE && !validatedData.code) {
+        // If switching to ONLINE_CODE but no code provided, keep existing code or require it
+        // The validation schema will handle this
+      }
+    }
     // Convert empty string to undefined for optional imagePath
     if (validatedData.imagePath !== undefined) {
       updateData.imagePath = validatedData.imagePath && validatedData.imagePath.trim() !== '' 
         ? validatedData.imagePath 
+        : undefined
+    }
+    // Convert empty string to undefined for optional code
+    if (validatedData.code !== undefined) {
+      updateData.code = validatedData.code && validatedData.code.trim() !== '' 
+        ? validatedData.code 
         : undefined
     }
 

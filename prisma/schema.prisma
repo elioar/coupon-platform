@@ -25,6 +25,11 @@ enum CouponStatus {
   REJECTED
 }
 
+enum CouponType {
+  ONLINE_CODE
+  QR_CODE
+}
+
 model User {
   id                String    @id @default(cuid())
   email             String    @unique
@@ -75,7 +80,8 @@ model Coupon {
   categoryId          String
   title               String
   description         String        @db.Text
-  code                String
+  code                String?
+  couponType          CouponType    @default(ONLINE_CODE)
   imagePath           String?
   discountPercentage  Int
   expirationDate      DateTime
