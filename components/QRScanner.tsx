@@ -210,7 +210,6 @@ export default function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
             aspectRatio: 1.0,
             // Better QR code detection settings
             disableFlip: false, // Allow rotation
-            rememberLastUsedCamera: true,
             // Advanced settings for better detection - balanced resolution
             videoConstraints: {
               facingMode: typeof cameraConfig === 'object' ? cameraConfig.facingMode : undefined,
