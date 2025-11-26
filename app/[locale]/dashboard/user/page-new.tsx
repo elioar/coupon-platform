@@ -14,7 +14,8 @@ interface Coupon {
   id: string
   title: string
   description: string
-  code: string
+  code: string | null
+  couponType: "ONLINE_CODE" | "QR_CODE"
   imagePath: string | null
   discountPercentage: number
   expirationDate: string

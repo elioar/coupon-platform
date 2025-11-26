@@ -13,7 +13,8 @@ interface Coupon {
   id: string
   title: string
   description: string
-  code: string
+  code: string | null
+  couponType: "ONLINE_CODE" | "QR_CODE"
   discountPercentage: number
   expirationDate: string
   status: string
