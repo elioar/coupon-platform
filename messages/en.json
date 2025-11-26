@@ -307,7 +307,10 @@
     "distanceAwayKm": "{distance} km away",
     "distanceAwayMeters": "{distance} m away",
     "saveCoupon": "Save coupon",
-    "unsaveCoupon": "Remove from saved"
+    "unsaveCoupon": "Remove from saved",
+    "showQR": "Show QR",
+    "qrCode": "QR Code",
+    "qrCodeDescription": "Show this QR code at the store"
   },
   "dashboard": {
     "sidebar": {
@@ -379,6 +382,15 @@
       "updateDescription": "Click the button below to save your changes and update your business profile.",
       "saving": "Saving...",
       "saveChanges": "Save Changes",
+      "scanQRCode": "Scan QR Code",
+      "scanQRButton": "Scan QR",
+      "scanQRDescription": "Redeem customer coupons",
+      "scanningQR": "Point your camera at the QR code",
+      "qrScanError": "Error validating QR code",
+      "user": "User",
+      "retry": "Try Again",
+      "uploadImage": "Upload Image",
+      "cameraTips": "Make sure you've granted camera permissions and that no other app is using the camera. Or upload a photo of the QR code.",
       "stats": {
         "totalCoupons": "Total Coupons",
         "approved": "Approved",

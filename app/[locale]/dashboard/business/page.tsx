@@ -12,6 +12,7 @@ import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
 import { useRouter } from "next/navigation"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
+import QRScanner from "@/components/QRScanner"
 
 const formatExpirationDate = (dateString: string, locale: string) => {
   const date = new Date(dateString)
@@ -95,6 +96,7 @@ export default function BusinessDashboard() {
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
   const [resubmittingCouponId, setResubmittingCouponId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [showQRScanner, setShowQRScanner] = useState(false)
   const [formErrors, setFormErrors] = useState<{
     title?: string
     description?: string
@@ -400,6 +402,32 @@ export default function BusinessDashboard() {
       setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setResubmittingCouponId(null)
+      setTimeout(() => setMessage(null), 5000)
+    }
+  }
+
+  const handleQRScan = async (token: string) => {
+    try {
+      const response = await fetch(`/api/coupons/redeem`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ redemptionToken: token })
+      })
+
+      const result = await response.json()
+
+      if (result.valid) {
+        setMessage({ 
+          type: "success", 
+          text: `${result.message}\n${t("user") || "User"}: ${result.user.name}` 
+        })
+      } else {
+        setMessage({ type: "error", text: result.message || result.error })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: t("qrScanError") || "Σφάλμα κατά την επικύρωση QR code" })
+    } finally {
+      setShowQRScanner(false)
       setTimeout(() => setMessage(null), 5000)
     }
   }
@@ -726,15 +754,26 @@ export default function BusinessDashboard() {
                   Here's what's happening with your coupons
                 </p>
               </div>
-              <Link
-                href={`/${locale}/dashboard/business?section=coupons`}
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
-              >
-                <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                  <path d="M12 4v16m8-8H4" />
-                </svg>
-                Create Coupon
-              </Link>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowQRScanner(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                >
+                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                  {t("scanQRButton") || "Scan QR"}
+                </button>
+                <Link
+                  href={`/${locale}/dashboard/business?section=coupons`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                >
+                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create Coupon
+                </Link>
+              </div>
             </div>
 
             {loading ? (
@@ -840,6 +879,20 @@ export default function BusinessDashboard() {
                             <p className="text-xs text-gray-500 dark:text-zinc-400">View all coupons</p>
                 </div>
                         </Link>
+                        <button
+                          onClick={() => setShowQRScanner(true)}
+                          className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                            <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                  </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{t("scanQRButton") || "Scan QR Code"}</p>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400">{t("scanQRDescription") || "Redeem customer coupons"}</p>
+                </div>
+                        </button>
               </div>
               </div>
           </div>
@@ -2578,6 +2631,25 @@ export default function BusinessDashboard() {
           </AnimatePresence>
         </div>
       </main>
+
+      {showQRScanner && (
+        <QRScanner 
+          onScanSuccess={handleQRScan} 
+          onClose={() => setShowQRScanner(false)} 
+        />
+      )}
+
+      {/* Floating QR Scanner Button - Always visible */}
+      <button
+        onClick={() => setShowQRScanner(true)}
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 p-3 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl dark:from-indigo-500 dark:to-purple-500"
+        title={t("scanQRButton") || "Scan QR Code"}
+        aria-label={t("scanQRButton") || "Scan QR Code"}
+      >
+        <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+        </svg>
+      </button>
     </div>
   )
 }

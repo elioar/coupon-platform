@@ -307,7 +307,10 @@
     "distanceAwayKm": "{distance} χλμ μακριά",
     "distanceAwayMeters": "{distance} μ. μακριά",
     "saveCoupon": "Αποθήκευση κουπονιού",
-    "unsaveCoupon": "Αφαίρεση από αποθηκευμένα"
+    "unsaveCoupon": "Αφαίρεση από αποθηκευμένα",
+    "showQR": "Εμφάνιση QR",
+    "qrCode": "QR Code",
+    "qrCodeDescription": "Δείξτε αυτό το QR code στο κατάστημα"
   },
   "dashboard": {
     "sidebar": {
@@ -379,6 +382,15 @@
       "updateDescription": "Πατήστε το κουμπί παρακάτω για να αποθηκεύσετε τις αλλαγές σας και να ενημερώσετε το προφίλ της επιχείρησής σας.",
       "saving": "Αποθήκευση...",
       "saveChanges": "Αποθήκευση Αλλαγών",
+      "scanQRCode": "Σάρωση QR Code",
+      "scanQRButton": "Σάρωση QR",
+      "scanQRDescription": "Εξαργύρωση κουπονιών πελατών",
+      "scanningQR": "Στοχεύστε την κάμερα στο QR code",
+      "qrScanError": "Σφάλμα κατά την επικύρωση QR code",
+      "user": "Χρήστης",
+      "retry": "Δοκίμασε Ξανά",
+      "uploadImage": "Ανέβασε Εικόνα",
+      "cameraTips": "Βεβαιώσου ότι έχεις δώσει άδεια πρόσβασης στην κάμερα και ότι καμία άλλη εφαρμογή δεν χρησιμοποιεί την κάμερα. Εναλλακτικά, ανέβασε μια φωτογραφία του QR code.",
       "stats": {
         "totalCoupons": "Σύνολο Κουπονιών",
         "approved": "Εγκεκριμένα",

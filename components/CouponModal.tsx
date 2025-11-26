@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { trackCouponEvent } from "@/lib/analytics"
+import CouponQRCode from "./CouponQRCode"
 
 interface Coupon {
   id: string
@@ -51,6 +52,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
   const tMembership = useTranslations("membership")
   const { data: session } = useSession()
   const [copied, setCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
   const hasTrackedView = useRef(false)
 
   const categoryName = locale === "el" ? coupon.category.nameEl : coupon.category.nameEn
@@ -216,16 +218,26 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
             </h3>
 
             {isMember ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-green-300 bg-white p-4 dark:border-green-700 dark:bg-zinc-900">
-                <code className="text-xl font-bold tracking-wider text-green-700 dark:text-green-300">
-                  {coupon.code}
-                </code>
-                <button
-                  onClick={copyCode}
-                  className="shrink-0 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95"
-                >
-                  {copied ? t("copiedCode") : t("copyCode")}
-                </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-green-300 bg-white p-4 dark:border-green-700 dark:bg-zinc-900">
+                  <code className="text-xl font-bold tracking-wider text-green-700 dark:text-green-300">
+                    {coupon.code}
+                  </code>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowQR(true)}
+                      className="shrink-0 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-blue-700 hover:to-indigo-700 hover:scale-105 active:scale-95"
+                    >
+                      {t("showQR")}
+                    </button>
+                    <button
+                      onClick={copyCode}
+                      className="shrink-0 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 hover:scale-105 active:scale-95"
+                    >
+                      {copied ? t("copiedCode") : t("copyCode")}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center">
@@ -248,6 +260,10 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
           </div>
         </div>
       </div>
+
+      {showQR && (
+        <CouponQRCode couponId={coupon.id} onClose={() => setShowQR(false)} />
+      )}
     </div>
   )
 }
