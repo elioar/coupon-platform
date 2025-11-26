@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         id: r.id,
         couponId: r.couponId,
         couponTitle: r.coupon.title,
-        couponCode: r.coupon.code,
+        couponCode: r.coupon.code || null,
         discountPercentage: r.coupon.discountPercentage,
         imagePath: r.coupon.imagePath,
         category: r.coupon.category,

@@ -246,7 +246,7 @@ export default function BusinessDashboard() {
     setFormData({
       title: coupon.title,
       description: coupon.description,
-      code: coupon.code,
+      code: coupon.code || "",
       categoryId: coupon.category.id,
       discountPercentage: coupon.discountPercentage,
       expirationDate: coupon.expirationDate.split('T')[0],

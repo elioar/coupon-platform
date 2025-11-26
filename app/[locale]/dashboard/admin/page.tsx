@@ -467,7 +467,7 @@ export default function AdminDashboard() {
     setCouponForm({
       title: coupon.title,
       description: coupon.description,
-      code: coupon.code,
+      code: coupon.code || "",
       categoryId: categoryId,
       discountPercentage: coupon.discountPercentage,
       expirationDate: coupon.expirationDate ? new Date(coupon.expirationDate).toISOString().slice(0, 16) : "",
@@ -636,7 +636,7 @@ export default function AdminDashboard() {
       const query = searchQuery.toLowerCase()
       const matchesSearch = 
         coupon.title.toLowerCase().includes(query) ||
-        coupon.code.toLowerCase().includes(query) ||
+        (coupon.code && coupon.code.toLowerCase().includes(query)) ||
         coupon.description.toLowerCase().includes(query) ||
         coupon.business?.name.toLowerCase().includes(query) ||
         coupon.business?.email.toLowerCase().includes(query)
@@ -998,7 +998,7 @@ export default function AdminDashboard() {
                               {coupon.business?.name || "—"}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-zinc-900 dark:text-zinc-100 sm:px-6 sm:py-4">
-                              {coupon.code}
+                              {coupon.code || "—"}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 sm:px-6 sm:py-4">
                               <span className="font-semibold text-violet-600 dark:text-violet-400">{coupon.discountPercentage}%</span>
@@ -1741,7 +1741,7 @@ export default function AdminDashboard() {
                                   <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                                     <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
-                                  <strong>{coupon.code}</strong>
+                                  <strong>{coupon.code || "N/A"}</strong>
                                 </span>
                                 <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
                                   <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
