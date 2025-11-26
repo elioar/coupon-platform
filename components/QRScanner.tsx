@@ -215,13 +215,8 @@ export default function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
               facingMode: typeof cameraConfig === 'object' ? cameraConfig.facingMode : undefined,
               width: { ideal: 1280, min: 640 }, // Balanced resolution
               height: { ideal: 720, min: 480 }
-            },
-            // Verbose logging to see what's happening
-            verbose: false, // Disable verbose to reduce noise, but keep error callbacks
-            // Try to use native BarcodeDetector API if available (better performance)
-            useBarCodeDetectorIfSupported: false, // Disable to use ZXing decoder which is more compatible
-            // Additional formats support
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+            }
+            // Note: verbose, useBarCodeDetectorIfSupported, and formatsToSupport are set in the Html5Qrcode constructor, not here
           },
           (decodedText, decodedResult) => {
             console.log("✅✅✅ QR Code detected!")
