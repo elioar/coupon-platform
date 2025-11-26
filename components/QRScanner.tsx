@@ -382,9 +382,9 @@ export default function QRScanner({ onScanSuccess, onClose }: QRScannerProps) {
 
     // Override removeChild to catch errors
     const originalRemoveChild = Node.prototype.removeChild
-    Node.prototype.removeChild = function(child: Node) {
+    Node.prototype.removeChild = function<T extends Node>(child: T): T {
       try {
-        return originalRemoveChild.call(this, child)
+        return originalRemoveChild.call(this, child) as T
       } catch (error: any) {
         const errorMsg = error?.message || String(error) || ""
         if (errorMsg.includes("not a child") || errorMsg.includes("NotFoundError")) {
