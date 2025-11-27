@@ -22,6 +22,7 @@ interface DashboardSidebarProps {
   userEmail: string
   isMobileMenuOpen?: boolean
   onMobileMenuClose?: () => void
+  onCreateCoupon?: () => void
 }
 
 export default function DashboardSidebar({
@@ -31,8 +32,10 @@ export default function DashboardSidebar({
   userEmail,
   isMobileMenuOpen: externalIsOpen,
   onMobileMenuClose,
+  onCreateCoupon,
 }: DashboardSidebarProps) {
   const t = useTranslations("dashboard.sidebar")
+  const tBusiness = useTranslations("dashboard.business")
   const tNav = useTranslations("nav")
   const pathname = usePathname()
   const router = useRouter()
@@ -366,6 +369,29 @@ export default function DashboardSidebar({
                 )
               })}
             </ul>
+
+            {/* Create Coupon Button - Only for BUSINESS role */}
+            {role === "BUSINESS" && onCreateCoupon && (
+              <div className="mt-4 px-4">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (onCreateCoupon) {
+                      onCreateCoupon()
+                    }
+                    closeMobileMenu()
+                  }}
+                  className="group w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-2.5 py-2 text-[10px] sm:text-xs font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                >
+                  <svg className="h-3.5 w-3.5 flex-shrink-0 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                    <path d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="truncate leading-tight">{tBusiness("createCoupon")}</span>
+                </button>
+              </div>
+            )}
 
             {/* Language & Theme Switcher */}
             <div className="mt-4 space-y-2 border-t border-gray-200 pt-4 dark:border-zinc-800">

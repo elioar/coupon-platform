@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
-import { CouponType } from "@prisma/client"
+import { CouponType, UsageLimitType } from "@prisma/client"
 
 const updateCouponSchema = z.object({
   title: z.string().min(3).max(200).optional(),
@@ -17,6 +17,12 @@ const updateCouponSchema = z.object({
   expirationDate: z.string().datetime().optional(),
   imagePath: z.string().optional(),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  usageLimitType: z.nativeEnum(UsageLimitType).optional(),
+  maxUsesPerUser: z.number().min(1).optional(),
+  hasTimeRestrictions: z.boolean().optional(),
+  validDays: z.array(z.number().min(0).max(6)).optional(),
+  validStartHour: z.number().min(0).max(23).optional(),
+  validEndHour: z.number().min(0).max(23).optional(),
 }).refine((data) => {
   // If couponType is ONLINE_CODE, code is required
   if (data.couponType === CouponType.ONLINE_CODE && data.code !== undefined) {
@@ -26,6 +32,42 @@ const updateCouponSchema = z.object({
 }, {
   message: "Code is required for online coupons",
   path: ["code"]
+}).refine((data) => {
+  // If usageLimitType is MULTIPLE_USE, maxUsesPerUser must be provided and >= 1
+  if (data.usageLimitType === UsageLimitType.MULTIPLE_USE && data.maxUsesPerUser !== undefined) {
+    return data.maxUsesPerUser >= 1
+  }
+  return true
+}, {
+  message: "Max uses per user must be at least 1",
+  path: ["maxUsesPerUser"]
+}).refine((data) => {
+  // If hasTimeRestrictions is true, validDays must have at least one day
+  if (data.hasTimeRestrictions === true && data.validDays !== undefined) {
+    return data.validDays.length > 0
+  }
+  return true
+}, {
+  message: "At least one day must be selected when time restrictions are enabled",
+  path: ["validDays"]
+}).refine((data) => {
+  // If hasTimeRestrictions is true, both validStartHour and validEndHour must be provided
+  if (data.hasTimeRestrictions === true) {
+    return data.validStartHour !== undefined && data.validEndHour !== undefined
+  }
+  return true
+}, {
+  message: "Start hour and end hour are required when time restrictions are enabled",
+  path: ["validStartHour"]
+}).refine((data) => {
+  // validStartHour must be < validEndHour
+  if (data.hasTimeRestrictions === true && data.validStartHour !== undefined && data.validEndHour !== undefined) {
+    return data.validStartHour < data.validEndHour
+  }
+  return true
+}, {
+  message: "Start hour must be less than end hour",
+  path: ["validStartHour"]
 })
 
 // GET - Get single coupon
@@ -112,6 +154,28 @@ export async function PATCH(
       updateData.code = validatedData.code && validatedData.code.trim() !== '' 
         ? validatedData.code 
         : undefined
+    }
+    // Handle usage limit fields
+    if (validatedData.usageLimitType !== undefined) {
+      updateData.usageLimitType = validatedData.usageLimitType
+      if (validatedData.usageLimitType === UsageLimitType.MULTIPLE_USE) {
+        updateData.maxUsesPerUser = validatedData.maxUsesPerUser
+      } else {
+        updateData.maxUsesPerUser = undefined
+      }
+    }
+    // Handle time restriction fields
+    if (validatedData.hasTimeRestrictions !== undefined) {
+      updateData.hasTimeRestrictions = validatedData.hasTimeRestrictions
+      if (validatedData.hasTimeRestrictions) {
+        updateData.validDays = validatedData.validDays || []
+        updateData.validStartHour = validatedData.validStartHour
+        updateData.validEndHour = validatedData.validEndHour
+      } else {
+        updateData.validDays = []
+        updateData.validStartHour = undefined
+        updateData.validEndHour = undefined
+      }
     }
 
     const updatedCoupon = await prisma.coupon.update({

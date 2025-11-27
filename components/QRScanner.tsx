@@ -548,12 +548,14 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
             
             {/* Processing Overlay */}
             {isProcessing && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-blue-500/20 backdrop-blur-sm p-4">
-                <div className="text-center max-w-sm">
-                  <div className="mx-auto mb-4 w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-blue-400 border-t-transparent animate-spin"></div>
-                  <p className="text-lg sm:text-xl font-semibold text-white">
-                    Processing...
-                  </p>
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="text-center max-w-sm w-full mx-4">
+                  <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-zinc-800">
+                    <div className="mx-auto mb-4 w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Επεξεργασία...
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -573,29 +575,29 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
             
             {/* Success Overlay */}
             {showSuccess && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-green-500/25 backdrop-blur-sm p-4">
-                <div className="text-center max-w-sm animate-slide-up">
-                  <div className="mx-auto mb-4 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-500 flex items-center justify-center shadow-lg animate-scale-in">
-                    <svg
-                      className="w-10 h-10 sm:w-12 sm:h-12 text-white animate-checkmark"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={3}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </div>
-                  <div className="space-y-2 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <p className="text-xl sm:text-2xl font-bold text-white">
-                      ✓ Valid QR Code
-                    </p>
-                    <p className="text-sm sm:text-base text-white/90 font-medium">
-                      Processing redemption...
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="text-center max-w-sm w-full mx-4">
+                  <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-zinc-800">
+                    <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-500 flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      Επιτυχής
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {successMessage || "Το κουπόνι εξαργυρώθηκε επιτυχώς"}
                     </p>
                   </div>
                 </div>
@@ -604,29 +606,29 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
 
             {/* Error Overlay - Already Redeemed */}
             {showRedeemedError && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-orange-500/25 backdrop-blur-sm p-4">
-                <div className="text-center max-w-sm mx-auto animate-slide-up">
-                  <div className="mx-auto mb-4 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-orange-500 flex items-center justify-center shadow-lg animate-scale-in">
-                    <svg
-                      className="w-10 h-10 sm:w-12 sm:h-12 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={3}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <div className="space-y-2 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <p className="text-xl sm:text-2xl font-bold text-white">
-                      ⚠ Already Redeemed
-                    </p>
-                    <p className="text-sm sm:text-base text-white/90 font-medium px-2">
-                      {redeemedErrorMessage || "This coupon was already used before"}
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="text-center max-w-sm w-full mx-4">
+                  <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-zinc-800">
+                    <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      Ήδη Εξαργυρωμένο
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {redeemedErrorMessage || "Αυτό το κουπόνι έχει ήδη χρησιμοποιηθεί"}
                     </p>
                   </div>
                 </div>
@@ -644,29 +646,34 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
             )}
 
             {/* Error State */}
-            {error && !showSuccess && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 p-4 sm:p-6 overflow-y-auto">
-                <div className="rounded-lg bg-white dark:bg-zinc-800 p-4 sm:p-6 text-center max-w-md w-full shadow-lg">
-                  <div className="mb-3 sm:mb-4 flex justify-center">
-                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {error && !showSuccess && !showRedeemedError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+                <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-lg p-6 text-center max-w-md w-full mx-4 border border-gray-200 dark:border-zinc-800">
+                  <div className="mb-4 flex justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500">
+                      <svg className="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                   </div>
-                  <p className="mb-3 sm:mb-4 text-xs sm:text-sm text-red-600 dark:text-red-400 font-medium break-words">{error}</p>
+                  <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                    Σφάλμα
+                  </h3>
+                  <p className="mb-5 text-sm text-gray-600 dark:text-gray-400 break-words">
+                    {error}
+                  </p>
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={startScanner}
                       className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                     >
-                      {t("retry") || "Try Again"}
+                      {t("retry") || "Δοκίμασε Ξανά"}
                     </button>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="w-full rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition hover:bg-gray-50 dark:hover:bg-zinc-700"
                     >
-                      {t("uploadImage") || "Upload Image"}
+                      {t("uploadImage") || "Ανέβασε Εικόνα"}
                     </button>
                   </div>
                 </div>

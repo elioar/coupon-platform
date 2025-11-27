@@ -30,6 +30,12 @@ enum CouponType {
   QR_CODE
 }
 
+enum UsageLimitType {
+  SINGLE_USE
+  MULTIPLE_USE
+  UNLIMITED
+}
+
 model User {
   id                String    @id @default(cuid())
   email             String    @unique
@@ -86,6 +92,12 @@ model Coupon {
   discountPercentage  Int
   expirationDate      DateTime
   status              CouponStatus  @default(PENDING)
+  usageLimitType      UsageLimitType @default(SINGLE_USE)
+  maxUsesPerUser      Int?
+  hasTimeRestrictions Boolean       @default(false)
+  validDays           Int[]         @default([])
+  validStartHour      Int?
+  validEndHour        Int?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   
@@ -129,9 +141,9 @@ model CouponRedemption {
   coupon          Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@unique([couponId, userId])
   @@index([redemptionToken])
   @@index([couponId])
   @@index([userId])
   @@index([redeemedAt])
+  @@index([couponId, userId])
 }

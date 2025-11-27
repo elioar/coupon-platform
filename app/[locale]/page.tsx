@@ -9,6 +9,7 @@ import Footer from '@/components/Footer';
 import CouponCard from '@/components/CouponCard';
 import { isMember } from '@/lib/client-utils';
 import { useSession } from 'next-auth/react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 interface Category {
   id: string;

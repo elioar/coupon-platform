@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth-helpers"
 import { randomBytes } from "crypto"
-import { CouponStatus } from "@prisma/client"
+import { CouponStatus, UsageLimitType } from "@prisma/client"
 
 // Ensure this runs in Node.js runtime (not edge)
 export const runtime = 'nodejs'
@@ -63,17 +63,59 @@ export async function POST(
       )
     }
 
-    // Check if user already has a token for this coupon
-    let redemption = await prisma.couponRedemption.findUnique({
-      where: {
-        couponId_userId: {
+    // Check usage limits based on coupon type
+    if (coupon.usageLimitType === UsageLimitType.SINGLE_USE) {
+      // For single use, check if user already has any redemption (redeemed or not)
+      const existingRedemption = await prisma.couponRedemption.findFirst({
+        where: {
           couponId: couponId,
           userId: user.id
         }
+      })
+      
+      if (existingRedemption) {
+        if (existingRedemption.redeemedAt) {
+          return NextResponse.json(
+            { error: "Coupon already redeemed" },
+            { status: 400 }
+          )
+        }
+        // User already has a token, return it
+        return NextResponse.json({
+          token: existingRedemption.redemptionToken,
+          couponId: couponId,
+          userId: user.id
+        })
+      }
+    } else if (coupon.usageLimitType === UsageLimitType.MULTIPLE_USE) {
+      // Count existing redemptions for this user
+      const redemptionCount = await prisma.couponRedemption.count({
+        where: {
+          couponId: couponId,
+          userId: user.id,
+          redeemedAt: { not: null }
+        }
+      })
+      
+      if (coupon.maxUsesPerUser && redemptionCount >= coupon.maxUsesPerUser) {
+        return NextResponse.json(
+          { error: `You have reached the maximum number of uses (${coupon.maxUsesPerUser}) for this coupon` },
+          { status: 400 }
+        )
+      }
+    }
+    // For UNLIMITED, no check needed - allow creating new redemption
+
+    // Check if user has an unredeemed token (for all types, we allow new tokens)
+    let redemption = await prisma.couponRedemption.findFirst({
+      where: {
+        couponId: couponId,
+        userId: user.id,
+        redeemedAt: null
       }
     })
 
-    // If no token exists, create one
+    // If no unredeemed token exists, create one
     if (!redemption) {
       // Generate unique token - try multiple times if there's a collision
       let token: string
@@ -108,31 +150,10 @@ export async function POST(
           }
         })
       } catch (createError: any) {
-        // Handle unique constraint violation
-        if (createError.code === 'P2002') {
-          console.error("Unique constraint violation:", createError)
-          // Try to fetch existing redemption
-          redemption = await prisma.couponRedemption.findUnique({
-            where: {
-              couponId_userId: {
-                couponId: couponId,
-                userId: user.id
-              }
-            }
-          })
-          if (!redemption) {
-            throw new Error("Failed to create or retrieve redemption")
-          }
-        } else {
-          throw createError
-        }
+        // Log error and re-throw
+        console.error("Error creating redemption:", createError)
+        throw createError
       }
-    } else if (redemption.redeemedAt) {
-      // If already redeemed, return error
-      return NextResponse.json(
-        { error: "Coupon already redeemed" },
-        { status: 400 }
-      )
     }
 
     // Return token for QR code

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
-import { CouponStatus, CouponType } from "@prisma/client"
+import { CouponStatus, CouponType, UsageLimitType } from "@prisma/client"
 
 const createCouponSchema = z.object({
   title: z.string().min(3).max(200),
@@ -16,6 +16,12 @@ const createCouponSchema = z.object({
   discountPercentage: z.number().min(1).max(100),
   expirationDate: z.string().datetime(),
   imagePath: z.string().optional(),
+  usageLimitType: z.nativeEnum(UsageLimitType).default(UsageLimitType.SINGLE_USE),
+  maxUsesPerUser: z.number().min(1).optional(),
+  hasTimeRestrictions: z.boolean().default(false),
+  validDays: z.array(z.number().min(0).max(6)).optional(),
+  validStartHour: z.number().min(0).max(23).optional(),
+  validEndHour: z.number().min(0).max(23).optional(),
 }).refine((data) => {
   // If couponType is ONLINE_CODE, code is required and must be at least 3 characters
   if (data.couponType === CouponType.ONLINE_CODE) {
@@ -26,6 +32,42 @@ const createCouponSchema = z.object({
 }, {
   message: "Code is required for online coupons",
   path: ["code"]
+}).refine((data) => {
+  // If usageLimitType is MULTIPLE_USE, maxUsesPerUser must be provided and >= 1
+  if (data.usageLimitType === UsageLimitType.MULTIPLE_USE) {
+    return data.maxUsesPerUser !== undefined && data.maxUsesPerUser >= 1
+  }
+  return true
+}, {
+  message: "Max uses per user is required for multiple uses",
+  path: ["maxUsesPerUser"]
+}).refine((data) => {
+  // If hasTimeRestrictions is true, validDays must have at least one day
+  if (data.hasTimeRestrictions) {
+    return data.validDays && data.validDays.length > 0
+  }
+  return true
+}, {
+  message: "At least one day must be selected when time restrictions are enabled",
+  path: ["validDays"]
+}).refine((data) => {
+  // If hasTimeRestrictions is true, both validStartHour and validEndHour must be provided
+  if (data.hasTimeRestrictions) {
+    return data.validStartHour !== undefined && data.validEndHour !== undefined
+  }
+  return true
+}, {
+  message: "Start hour and end hour are required when time restrictions are enabled",
+  path: ["validStartHour"]
+}).refine((data) => {
+  // validStartHour must be < validEndHour
+  if (data.hasTimeRestrictions && data.validStartHour !== undefined && data.validEndHour !== undefined) {
+    return data.validStartHour < data.validEndHour
+  }
+  return true
+}, {
+  message: "Start hour must be less than end hour",
+  path: ["validStartHour"]
 })
 
 // GET - List approved coupons (public) or all coupons for business/admin
@@ -126,6 +168,18 @@ export async function POST(request: NextRequest) {
         : (validatedData.code && validatedData.code.trim() !== '' ? validatedData.code : undefined),
       imagePath: validatedData.imagePath && validatedData.imagePath.trim() !== '' 
         ? validatedData.imagePath 
+        : undefined,
+      maxUsesPerUser: validatedData.usageLimitType === UsageLimitType.MULTIPLE_USE
+        ? validatedData.maxUsesPerUser
+        : undefined,
+      validDays: validatedData.hasTimeRestrictions && validatedData.validDays && validatedData.validDays.length > 0
+        ? validatedData.validDays
+        : [],
+      validStartHour: validatedData.hasTimeRestrictions
+        ? validatedData.validStartHour
+        : undefined,
+      validEndHour: validatedData.hasTimeRestrictions
+        ? validatedData.validEndHour
         : undefined,
       businessId: user.id,
       expirationDate: new Date(validatedData.expirationDate),

@@ -37,6 +37,12 @@ interface Coupon {
   expirationDate: string
   status: string
   imagePath: string | null
+  usageLimitType?: "SINGLE_USE" | "MULTIPLE_USE" | "UNLIMITED"
+  maxUsesPerUser?: number | null
+  hasTimeRestrictions?: boolean
+  validDays?: number[]
+  validStartHour?: number | null
+  validEndHour?: number | null
   createdAt: string
   category: {
     id: string
@@ -74,15 +80,20 @@ export default function BusinessDashboard() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showTypeSelection, setShowTypeSelection] = useState(false)
 
-  // Handle escape key to close modal
+  // Handle escape key to close modals
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showForm) {
+      if (e.key === 'Escape') {
+        if (showForm) {
         setShowForm(false)
+        } else if (showTypeSelection) {
+          setShowTypeSelection(false)
       }
     }
-    if (showForm) {
+    }
+    if (showForm || showTypeSelection) {
       document.addEventListener('keydown', handleEscape)
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden'
@@ -91,7 +102,7 @@ export default function BusinessDashboard() {
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = 'unset'
     }
-  }, [showForm])
+  }, [showForm, showTypeSelection])
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("ALL")
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
@@ -105,6 +116,10 @@ export default function BusinessDashboard() {
     categoryId?: string
     discountPercentage?: string
     expirationDate?: string
+    maxUsesPerUser?: string
+    validDays?: string
+    validStartHour?: string
+    validEndHour?: string
   }>({})
   
   const [formData, setFormData] = useState({
@@ -116,6 +131,12 @@ export default function BusinessDashboard() {
     discountPercentage: 10,
     expirationDate: "",
     imagePath: "",
+    usageLimitType: "SINGLE_USE" as "SINGLE_USE" | "MULTIPLE_USE" | "UNLIMITED",
+    maxUsesPerUser: undefined as number | undefined,
+    hasTimeRestrictions: false,
+    validDays: [] as number[],
+    validStartHour: undefined as number | undefined,
+    validEndHour: undefined as number | undefined,
   })
   const [submitting, setSubmitting] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -141,20 +162,54 @@ export default function BusinessDashboard() {
   const [analytics, setAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [dateRange, setDateRange] = useState("30d")
+  const [overviewStats, setOverviewStats] = useState({
+    views: 0,
+    redemptions: 0
+  })
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [couponsRes, categoriesRes] = await Promise.all([
+        const [couponsRes, categoriesRes, analyticsRes] = await Promise.all([
           fetch(`/api/coupons?businessId=${session?.user.id}`),
           fetch('/api/categories'),
+          fetch('/api/business/analytics?period=365d'),
         ])
+
+        // Check if responses are OK before parsing JSON
+        if (!couponsRes.ok) {
+          const text = await couponsRes.text()
+          console.error("Failed to fetch coupons:", couponsRes.status, text.substring(0, 200))
+          throw new Error(`Failed to fetch coupons: ${couponsRes.status}`)
+        }
+        if (!categoriesRes.ok) {
+          const text = await categoriesRes.text()
+          console.error("Failed to fetch categories:", categoriesRes.status, text.substring(0, 200))
+          throw new Error(`Failed to fetch categories: ${categoriesRes.status}`)
+        }
+        if (!analyticsRes.ok) {
+          const text = await analyticsRes.text()
+          console.error("Failed to fetch analytics:", analyticsRes.status, text.substring(0, 200))
+          // Analytics is optional, so we'll continue even if it fails
+        }
 
         const couponsData = await couponsRes.json()
         const categoriesData = await categoriesRes.json()
+        let analyticsData = null
+        if (analyticsRes.ok) {
+          analyticsData = await analyticsRes.json()
+        }
 
         setCoupons(couponsData.coupons || [])
         setCategories(categoriesData.categories || [])
+        
+        // Set overview stats (all-time views and redemptions)
+        if (analyticsData.summary) {
+          setOverviewStats({
+            views: analyticsData.summary.views || 0,
+            redemptions: analyticsData.summary.redemptions || 0
+          })
+        }
       } catch (error) {
         console.error("Error fetching data:", error)
       } finally {
@@ -210,10 +265,10 @@ export default function BusinessDashboard() {
 
     // Code is only required for ONLINE_CODE type
     if (formData.couponType === 'ONLINE_CODE') {
-      if (!formData.code || formData.code.trim() === '') {
+    if (!formData.code || formData.code.trim() === '') {
         errors.code = 'Coupon code is required for online coupons'
-      } else if (formData.code.trim().length < 2) {
-        errors.code = 'Coupon code must be at least 2 characters'
+    } else if (formData.code.trim().length < 2) {
+      errors.code = 'Coupon code must be at least 2 characters'
       }
     }
 
@@ -238,12 +293,43 @@ export default function BusinessDashboard() {
       }
     }
 
+    // Validate usage limits
+    if (formData.usageLimitType === 'MULTIPLE_USE') {
+      if (!formData.maxUsesPerUser || formData.maxUsesPerUser < 1) {
+        errors.maxUsesPerUser = tCouponForm('validationErrorMaxUsesRequired')
+      }
+    }
+
+    // Validate time restrictions (only for QR_CODE)
+    if (formData.couponType === 'QR_CODE' && formData.hasTimeRestrictions) {
+      if (!formData.validDays || formData.validDays.length === 0) {
+        errors.validDays = tCouponForm('validationErrorValidDaysRequired')
+      }
+      if (formData.validStartHour === undefined || formData.validEndHour === undefined) {
+        errors.validStartHour = tCouponForm('validationErrorTimeRangeRequired')
+      } else {
+        if (formData.validStartHour < 0 || formData.validStartHour > 23 || 
+            formData.validEndHour < 0 || formData.validEndHour > 23) {
+          errors.validStartHour = tCouponForm('validationErrorHoursRange')
+        } else if (formData.validStartHour >= formData.validEndHour) {
+          errors.validStartHour = tCouponForm('validationErrorTimeRangeInvalid')
+        }
+      }
+    }
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // If editing, use the update handler instead
+    if (editingCouponId) {
+      handleUpdateCoupon(e)
+      return
+    }
+    
     setSubmitting(true)
     setMessage(null)
     setFormErrors({})
@@ -281,6 +367,12 @@ export default function BusinessDashboard() {
           discountPercentage: 10,
           expirationDate: "",
           imagePath: "",
+          usageLimitType: "SINGLE_USE",
+          maxUsesPerUser: undefined,
+          hasTimeRestrictions: false,
+          validDays: [],
+          validStartHour: undefined,
+          validEndHour: undefined,
         })
         setMessage({ type: 'success', text: 'Coupon created successfully! Waiting for admin approval.' })
       } else {
@@ -308,8 +400,14 @@ export default function BusinessDashboard() {
       discountPercentage: coupon.discountPercentage,
       expirationDate: coupon.expirationDate.split('T')[0],
       imagePath: coupon.imagePath || "",
+      usageLimitType: coupon.usageLimitType || "SINGLE_USE",
+      maxUsesPerUser: coupon.maxUsesPerUser || undefined,
+      hasTimeRestrictions: coupon.hasTimeRestrictions || false,
+      validDays: coupon.validDays || [],
+      validStartHour: coupon.validStartHour || undefined,
+      validEndHour: coupon.validEndHour || undefined,
     })
-    setShowForm(false)
+    setShowForm(true) // Open the modal for editing
   }
 
   const handleUpdateCoupon = async (e: React.FormEvent) => {
@@ -336,6 +434,7 @@ export default function BusinessDashboard() {
       if (response.ok) {
         setCoupons(coupons.map(c => c.id === editingCouponId ? data.coupon : c))
         setEditingCouponId(null)
+        setShowForm(false) // Close the modal after successful update
         setFormData({
           title: "",
           description: "",
@@ -345,6 +444,12 @@ export default function BusinessDashboard() {
           discountPercentage: 10,
           expirationDate: "",
           imagePath: "",
+          usageLimitType: "SINGLE_USE",
+          maxUsesPerUser: undefined,
+          hasTimeRestrictions: false,
+          validDays: [],
+          validStartHour: undefined,
+          validEndHour: undefined,
         })
         setMessage({ type: 'success', text: 'Coupon updated successfully!' })
       } else {
@@ -505,6 +610,7 @@ export default function BusinessDashboard() {
 
   const cancelEdit = () => {
     setEditingCouponId(null)
+    setShowForm(false) // Close the modal
     setFormData({
       title: "",
       description: "",
@@ -514,6 +620,12 @@ export default function BusinessDashboard() {
       discountPercentage: 10,
       expirationDate: "",
       imagePath: "",
+      usageLimitType: "SINGLE_USE",
+      maxUsesPerUser: undefined,
+      hasTimeRestrictions: false,
+      validDays: [],
+      validStartHour: undefined,
+      validEndHour: undefined,
     })
   }
 
@@ -670,8 +782,8 @@ export default function BusinessDashboard() {
   const OverviewSkeleton = () => (
     <div className="space-y-8 animate-pulse">
       {/* Stats Cards Skeleton */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="rounded-2xl bg-gray-100 dark:bg-zinc-800 p-6">
             <div className="h-3 w-24 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
             <div className="h-8 w-16 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
@@ -681,8 +793,8 @@ export default function BusinessDashboard() {
       </div>
 
       {/* Quick Actions Skeleton */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
             <div className="h-10 w-10 bg-gray-200 dark:bg-zinc-700 rounded-lg mb-4"></div>
             <div className="h-5 w-24 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
@@ -691,31 +803,17 @@ export default function BusinessDashboard() {
         ))}
       </div>
 
-      {/* Status Overview Skeleton */}
-      <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
-        <div className="h-6 w-40 bg-gray-300 dark:bg-zinc-700 rounded mb-6"></div>
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="mb-4">
-            <div className="flex justify-between mb-2">
-              <div className="h-4 w-24 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-              <div className="h-4 w-12 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-            </div>
-            <div className="h-2 w-full bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
-          </div>
-        ))}
-      </div>
-
       {/* Recent Coupons Skeleton */}
       <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
         <div className="h-6 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
-        {[...Array(5)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="flex items-center gap-4 py-3 border-b border-gray-200 dark:border-zinc-800 last:border-0">
-            <div className="h-12 w-12 bg-gray-200 dark:bg-zinc-700 rounded-lg"></div>
+            <div className="h-16 w-16 bg-gray-200 dark:bg-zinc-700 rounded-lg"></div>
             <div className="flex-1">
               <div className="h-4 w-32 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
               <div className="h-3 w-24 bg-gray-200 dark:bg-zinc-800 rounded"></div>
             </div>
-            <div className="h-6 w-16 bg-gray-200 dark:bg-zinc-700 rounded-full"></div>
+            <div className="h-5 w-5 bg-gray-200 dark:bg-zinc-700 rounded"></div>
           </div>
         ))}
       </div>
@@ -797,8 +895,8 @@ export default function BusinessDashboard() {
   )
 
   const CouponsStatsSkeleton = () => (
-    <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-pulse">
-      {[...Array(4)].map((_, i) => (
+    <div className="mb-8 grid gap-4 sm:grid-cols-3 animate-pulse">
+      {[...Array(3)].map((_, i) => (
         <div key={i} className="rounded-2xl bg-gray-100 dark:bg-zinc-800 p-6">
           <div className="h-3 w-16 bg-gray-300 dark:bg-zinc-700 rounded mb-4"></div>
           <div className="h-8 w-12 bg-gray-300 dark:bg-zinc-700 rounded mb-2"></div>
@@ -811,9 +909,6 @@ export default function BusinessDashboard() {
   const renderSection = () => {
     switch (section) {
       case "overview":
-        const recentCoupons = coupons.slice(0, 5).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        const approvalRate = stats.total > 0 ? ((stats.approved / stats.total) * 100).toFixed(1) : 0
-        
         return (
           <div className="space-y-8">
             {/* Header */}
@@ -830,21 +925,24 @@ export default function BusinessDashboard() {
                 <button
                   onClick={() => setShowQRScanner(true)}
                   className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                >
-                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+              >
+                <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                   </svg>
                   {t("scanQRButton") || "Scan QR"}
                 </button>
-                <Link
-                  href={`/${locale}/dashboard/business?section=coupons`}
-                  className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                <button
+                  onClick={() => {
+                    setShowTypeSelection(true)
+                    setEditingCouponId(null)
+                  }}
+                  className="group inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
                 >
-                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create Coupon
-                </Link>
+                  <svg className="h-4 w-4 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M12 4v16m8-8H4" />
+                </svg>
+                  {t("createCoupon")}
+                </button>
               </div>
             </div>
 
@@ -853,90 +951,54 @@ export default function BusinessDashboard() {
             ) : (
               <>
                 {/* Stats Cards */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-3">
                   <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-white p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
                     <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
                     <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Total Coupons</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">{t("stats.totalCoupons")}</p>
                       <p className="mt-3 text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">{stats.total}</p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">All time</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">{t("stats.allTime")}</p>
                 </div>
                 </div>
-                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 to-white p-6 transition hover:shadow-md dark:from-amber-950/20 dark:to-zinc-800/30">
-                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-amber-200/50 blur-2xl dark:bg-amber-900/30"></div>
+                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-white p-6 transition hover:shadow-md dark:from-blue-950/20 dark:to-zinc-800/30">
+                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-blue-200/50 blur-2xl dark:bg-blue-900/30"></div>
                     <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">{t("pending")}</p>
-                      <p className="mt-3 text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">{stats.pending}</p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Awaiting review</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">{t("stats.views")}</p>
+                      <p className="mt-3 text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">{overviewStats.views.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">{t("stats.totalViews")}</p>
                 </div>
                 </div>
                   <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
                     <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
                     <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("approved")}</p>
-                      <p className="mt-3 text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">{stats.approved}</p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Active now</p>
-              </div>
-          </div>
-                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-white p-6 transition hover:shadow-md dark:from-blue-950/20 dark:to-zinc-800/30">
-                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-blue-200/50 blur-2xl dark:bg-blue-900/30"></div>
-                    <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">Approval Rate</p>
-                      <p className="mt-3 text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">{approvalRate}%</p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Success rate</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("stats.redemptions")}</p>
+                      <p className="mt-3 text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">{overviewStats.redemptions.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">{t("stats.totalRedemptions")}</p>
             </div>
               </div>
                 </div>
 
-                {/* Quick Actions & Recent Activity */}
-                <div className="grid gap-6 lg:grid-cols-3">
                   {/* Quick Actions */}
-                  <div className="lg:col-span-2">
                     <div className="rounded-2xl bg-white p-6 dark:bg-zinc-900/50">
-                      <h2 className="mb-6 text-base font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Link
-                          href={`/${locale}/dashboard/business?section=coupons`}
-                          className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                            <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <h2 className="mb-6 text-base font-semibold text-gray-900 dark:text-white">{t("quickActions")}</h2>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <button
+                      onClick={() => {
+                        setShowTypeSelection(true)
+                        setEditingCouponId(null)
+                      }}
+                      className="group w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-violet-50 to-violet-100/50 p-4 text-left transition-all hover:from-violet-100 hover:to-violet-200/50 hover:shadow-md hover:shadow-violet-500/10 active:scale-[0.98] dark:from-violet-900/30 dark:to-violet-900/20 dark:hover:from-violet-900/40 dark:hover:to-violet-900/30"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 shadow-md group-hover:scale-110 transition-transform">
+                        <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                               <path d="M12 4v16m8-8H4" />
                             </svg>
                   </div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">Create Coupon</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">Add a new discount</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("createCoupon")}</p>
+                        <p className="text-xs text-gray-600 dark:text-zinc-400">Add a new discount</p>
                   </div>
-                        </Link>
-                        <Link
-                          href={`/${locale}/dashboard/business?section=insights`}
-                          className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                    </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">View Analytics</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">See performance metrics</p>
-                    </div>
-                        </Link>
-                        <Link
-                          href={`/${locale}/dashboard/business?section=profile`}
-                          className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-                            <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                    </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">Edit Profile</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">Update business info</p>
-                    </div>
-                        </Link>
+                    </button>
                         <Link
                           href={`/${locale}/dashboard/business?section=coupons`}
                           className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
@@ -951,120 +1013,116 @@ export default function BusinessDashboard() {
                             <p className="text-xs text-gray-500 dark:text-zinc-400">View all coupons</p>
                 </div>
                         </Link>
-                        <button
-                          onClick={() => setShowQRScanner(true)}
-                          className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                            <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    <button
+                      onClick={() => setShowQRScanner(true)}
+                      className="group flex items-center gap-3 rounded-xl bg-gray-50 p-4 transition hover:bg-gray-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                        <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                             </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{t("scanQRButton") || "Scan QR Code"}</p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400">{t("scanQRDescription") || "Redeem customer coupons"}</p>
                   </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{t("scanQRButton") || "Scan QR Code"}</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">{t("scanQRDescription") || "Redeem customer coupons"}</p>
+                    </button>
                 </div>
-                        </button>
-              </div>
-              </div>
-          </div>
-
-                  {/* Status Overview */}
-                  <div className="rounded-2xl bg-white p-6 dark:bg-zinc-900/50">
-                    <h2 className="mb-6 text-base font-semibold text-gray-900 dark:text-white">Status Overview</h2>
-                    <div className="space-y-4">
-            <div>
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="text-gray-600 dark:text-zinc-400">Approved</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{stats.approved}</span>
-            </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
-                          <div 
-                            className="h-full rounded-full bg-green-500 transition-all"
-                            style={{ width: `${stats.total > 0 ? (stats.approved / stats.total) * 100 : 0}%` }}
-                          ></div>
-            </div>
-          </div>
-            <div>
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="text-gray-600 dark:text-zinc-400">Pending</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{stats.pending}</span>
-            </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
-                          <div 
-                            className="h-full rounded-full bg-amber-500 transition-all"
-                            style={{ width: `${stats.total > 0 ? (stats.pending / stats.total) * 100 : 0}%` }}
-                          ></div>
-            </div>
-          </div>
-                      <div>
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="text-gray-600 dark:text-zinc-400">Rejected</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{stats.rejected}</span>
-                    </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
-                          <div 
-                            className="h-full rounded-full bg-red-500 transition-all"
-                            style={{ width: `${stats.total > 0 ? (stats.rejected / stats.total) * 100 : 0}%` }}
-                          ></div>
-                  </div>
-                    </div>
-                  </div>
-                    </div>
-                  </div>
+                </div>
 
                 {/* Recent Coupons */}
-                {recentCoupons.length > 0 && (
+                {coupons.length > 0 && (
                   <div className="rounded-2xl bg-white p-6 dark:bg-zinc-900/50">
                     <div className="mb-6 flex items-center justify-between">
                       <div>
                         <h2 className="text-base font-semibold text-gray-900 dark:text-white">Recent Coupons</h2>
                         <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your latest coupon activity</p>
-                    </div>
-                    <Link
-                      href={`/${locale}/dashboard/business?section=coupons`}
+                      </div>
+                      <Link
+                        href={`/${locale}/dashboard/business?section=coupons`}
                         className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
                       >
                         View all →
-                    </Link>
+                      </Link>
                     </div>
-                    <div className="space-y-2">
-                      {recentCoupons.map((coupon) => (
-                    <Link
-                          key={coupon.id}
-                          href={`/${locale}/dashboard/business?section=coupons`}
-                          className="group flex items-center justify-between rounded-xl bg-gray-50/50 p-4 transition hover:bg-gray-100/50 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="truncate text-sm font-medium text-gray-900 dark:text-white">{coupon.title}</h3>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                coupon.status === 'APPROVED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                coupon.status === 'PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              }`}>
-                                {t(coupon.status.toLowerCase())}
-                              </span>
-                      </div>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-                              {new Date(coupon.createdAt).toLocaleDateString(locale === 'el' ? 'el-GR' : 'en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </p>
-                          </div>
-                          <div className="ml-4 flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{coupon.discountPercentage}% OFF</span>
-                            <svg className="h-4 w-4 text-gray-400 transition group-hover:text-gray-600 dark:text-zinc-500 dark:group-hover:text-zinc-300" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M9 5l7 7-7 7" />
-                            </svg>
-                      </div>
-                    </Link>
-                      ))}
+                    <div className="space-y-3">
+                      {coupons
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .slice(0, 3)
+                        .map((coupon) => (
+                          <Link
+                            key={coupon.id}
+                            href={`/${locale}/dashboard/business?section=coupons`}
+                            className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-all hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-800/30 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
+                          >
+                            {/* Image */}
+                            {coupon.imagePath ? (
+                              <div className="flex-shrink-0">
+                                <img
+                                  src={coupon.imagePath}
+                                  alt={coupon.title}
+                                  className="h-16 w-16 rounded-lg object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
+                                <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                                  {coupon.title}
+                                </h3>
+                                <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  coupon.status === 'APPROVED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                  coupon.status === 'PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                }`}>
+                                  {t(coupon.status.toLowerCase())}
+                                </span>
+                              </div>
+                              <p className="truncate text-xs text-gray-600 dark:text-zinc-400 mb-2">
+                                {coupon.description}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                {coupon.couponType === "ONLINE_CODE" && coupon.code && (
+                                  <span className="text-gray-500 dark:text-zinc-500">
+                                    Code: <span className="font-medium text-gray-700 dark:text-zinc-300">{coupon.code}</span>
+                                  </span>
+                                )}
+                                {coupon.couponType === "QR_CODE" && (
+                                  <span className="text-gray-500 dark:text-zinc-500">
+                                    QR Code
+                                  </span>
+                                )}
+                                <span className="text-gray-400 dark:text-zinc-600">•</span>
+                                <span className="font-semibold text-violet-600 dark:text-violet-400">
+                                  {coupon.discountPercentage}% OFF
+                                </span>
+                                <span className="text-gray-400 dark:text-zinc-600">•</span>
+                                <span className="text-gray-500 dark:text-zinc-500">
+                                  {formatExpirationDate(coupon.expirationDate, locale)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Arrow */}
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-gray-400 transition group-hover:text-violet-600 dark:text-zinc-500 dark:group-hover:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </Link>
+                        ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
               </>
           )}
           </div>
@@ -1843,6 +1901,10 @@ export default function BusinessDashboard() {
         userEmail={session?.user.email || ""}
         isMobileMenuOpen={isMobileMenuOpen}
         onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+        onCreateCoupon={() => {
+          setShowTypeSelection(true)
+          setEditingCouponId(null)
+        }}
       />
 
       <DashboardHeader
@@ -1889,85 +1951,302 @@ export default function BusinessDashboard() {
                 ) : (
                   <>
                     {/* Statistics Cards */}
-              <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {/* Total Coupons */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-white p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
-                  <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
-                  <div className="relative">
-                    <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Total</p>
-                    <p className="mt-3 text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
-                      {stats.total}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">All coupons</p>
-                  </div>
-                  </div>
+                    <div className="mb-6 sm:mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                      {/* Total Coupons */}
+                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
+                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
+                        <div className="relative">
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Total</p>
+                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                            {stats.total}
+                          </p>
+                          <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-zinc-500">All coupons</p>
+                        </div>
+                      </div>
 
-                  {/* Pending */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 to-white p-6 transition hover:shadow-md dark:from-amber-950/20 dark:to-zinc-800/30">
-                  <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-amber-200/50 blur-2xl dark:bg-amber-900/30"></div>
-                  <div className="relative">
-                    <p className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">{t("pending")}</p>
-                    <p className="mt-3 text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
-                      {stats.pending}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Awaiting review</p>
-                </div>
-              </div>
+                      {/* Pending */}
+                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-amber-950/20 dark:to-zinc-800/30">
+                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-amber-200/50 blur-2xl dark:bg-amber-900/30"></div>
+                        <div className="relative">
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">{t("pending")}</p>
+                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
+                            {stats.pending}
+                          </p>
+                          <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-zinc-500">Awaiting review</p>
+                        </div>
+                      </div>
 
-                  {/* Approved */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
-                  <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
-                  <div className="relative">
-                    <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("approved")}</p>
-                    <p className="mt-3 text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                      {stats.approved}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Active now</p>
+                      {/* Approved */}
+                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
+                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
+                        <div className="relative">
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("approved")}</p>
+                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                            {stats.approved}
+                          </p>
+                          <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-zinc-500">Active now</p>
+                        </div>
+                      </div>
+
+                      {/* Rejected */}
+                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-red-950/20 dark:to-zinc-800/30">
+                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-red-200/50 blur-2xl dark:bg-red-900/30"></div>
+                        <div className="relative">
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-red-600 dark:text-red-400">{t("rejected")}</p>
+                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
+                            {stats.rejected}
+                          </p>
+                          <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-zinc-500">Not approved</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Rejected */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-50 to-white p-6 transition hover:shadow-md dark:from-red-950/20 dark:to-zinc-800/30">
-                  <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-red-200/50 blur-2xl dark:bg-red-900/30"></div>
-                  <div className="relative">
-                    <p className="text-xs font-medium uppercase tracking-wider text-red-600 dark:text-red-400">{t("rejected")}</p>
-                    <p className="mt-3 text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
-                      {stats.rejected}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Not approved</p>
-                </div>
-              </div>
-            </div>
                   </>
                 )}
 
             {/* Header with Create Button */}
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Coupons</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Manage your discount offers</p>
-            </div>
+            <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Coupons</h2>
+                <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">Manage your discount offers</p>
+              </div>
               <button
-              onClick={() => {
-                  setShowForm(true)
-                setEditingCouponId(null)
+                onClick={() => {
+                  setShowTypeSelection(true)
+                  setEditingCouponId(null)
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                className="group inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
               >
-                <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                   <path d="M12 4v16m8-8H4" />
                 </svg>
                 {t("createCoupon")}
               </button>
-          </div>
+            </div>
 
-            {/* Create Coupon Modal */}
+            {/* Filter Tabs */}
+            <div className="mb-4 sm:mb-6 overflow-hidden rounded-xl sm:rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex gap-1 p-1 overflow-x-auto">
+                {(["ALL", "PENDING", "APPROVED", "REJECTED"] as FilterStatus[]).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setFilterStatus(status)}
+                    className={`flex-1 min-w-[80px] sm:min-w-0 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
+                      filterStatus === status
+                        ? "bg-violet-600 text-white shadow-sm"
+                        : "text-gray-600 hover:bg-gray-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {status === "ALL" ? t("all") : status}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Coupons List */}
+            {loading ? (
+              <CouponsListSkeleton />
+            ) : filteredCoupons.length === 0 ? (
+              <div className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white p-8 sm:p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="mx-auto mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
+                  <svg className="h-6 w-6 sm:h-8 sm:w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                  No coupons found
+                </h3>
+                <p className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-zinc-400 px-4">
+                  {filterStatus === "ALL" 
+                    ? "You haven't created any coupons yet. Click the button above to create your first coupon!"
+                    : `You don't have any ${filterStatus.toLowerCase()} coupons.`}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 sm:space-y-4">
+                {filteredCoupons.map((coupon) => (
+                  <div
+                    key={coupon.id}
+                    className="group rounded-lg sm:rounded-xl border border-gray-200 bg-white p-4 sm:p-6 transition-all hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900/50"
+                  >
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                      {/* Image */}
+                      {coupon.imagePath ? (
+                        <div className="flex-shrink-0 w-full sm:w-auto">
+                          <img
+                            src={coupon.imagePath}
+                            alt={coupon.title}
+                            className="h-32 sm:h-20 w-full sm:w-20 rounded-lg object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-32 sm:h-20 w-full sm:w-20 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
+                          <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white break-words">
+                                {coupon.title}
+                              </h3>
+                              <span className={`self-start sm:self-auto flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(coupon.status)}`}>
+                                {t(coupon.status.toLowerCase())}
+                              </span>
+                            </div>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-zinc-400 mb-3 line-clamp-2 sm:line-clamp-2">
+                              {coupon.description}
+                            </p>
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-x-4 sm:gap-y-1 text-xs sm:text-sm">
+                              {coupon.couponType === "ONLINE_CODE" && coupon.code && (
+                                <span className="text-gray-600 dark:text-zinc-400">
+                                  Code: <span className="font-medium text-gray-900 dark:text-white">{coupon.code}</span>
+                                </span>
+                              )}
+                              {coupon.couponType === "QR_CODE" && (
+                                <span className="text-gray-600 dark:text-zinc-400">QR Code</span>
+                              )}
+                              <span className="font-semibold text-violet-600 dark:text-violet-400">
+                                {coupon.discountPercentage}% OFF
+                              </span>
+                              <span className="text-gray-600 dark:text-zinc-400">
+                                Expires: {formatExpirationDate(coupon.expirationDate, locale)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Actions */}
+                          <div className="flex gap-2 sm:flex-shrink-0">
+                            <button
+                              onClick={() => handleEditCoupon(coupon)}
+                              className="flex-1 sm:flex-initial rounded-lg border border-gray-300 bg-white px-4 py-2 sm:p-2 text-sm sm:text-base text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                              title="Edit"
+                            >
+                              <span className="sm:hidden">Edit</span>
+                              <svg className="hidden sm:block h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setDeletingCouponId(coupon.id)}
+                              className="flex-1 sm:flex-initial rounded-lg border border-red-300 bg-white px-4 py-2 sm:p-2 text-sm sm:text-base text-red-600 transition hover:bg-red-50 hover:text-red-900 dark:border-red-700 dark:bg-zinc-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                              title="Delete"
+                            >
+                              <span className="sm:hidden">Delete</span>
+                              <svg className="hidden sm:block h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+        </div>
+      </main>
+
+      {/* Coupon Type Selection Modal - Always available */}
+      {showTypeSelection && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTypeSelection(false)
+            }
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm dark:bg-black/70"></div>
+          
+          {/* Modal */}
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-xl dark:bg-zinc-900 overflow-hidden" style={{ animation: 'scaleIn 0.2s ease-out' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-4 sm:px-5 sm:py-5 border-b border-gray-100 dark:border-zinc-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tCouponForm("couponType")}</h3>
+              <button
+                onClick={() => setShowTypeSelection(false)}
+                className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                aria-label="Close modal"
+              >
+                <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 sm:p-5">
+              <div className="space-y-3">
+                {/* Online Code Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, couponType: "ONLINE_CODE", code: "" }))
+                    setShowTypeSelection(false)
+                    setShowForm(true)
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-violet-500 hover:bg-violet-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-violet-500 dark:hover:bg-violet-900/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                      <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white">{tCouponForm("onlineCode")}</div>
+                      <div className="mt-0.5 text-xs text-gray-500 dark:text-zinc-400">{tCouponForm("onlineCodeDescription")}</div>
+                    </div>
+                  </div>
+                </button>
+
+                {/* QR Code Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, couponType: "QR_CODE", code: "" }))
+                    setShowTypeSelection(false)
+                    setShowForm(true)
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-violet-500 hover:bg-violet-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-violet-500 dark:hover:bg-violet-900/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                      <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white">{tCouponForm("qrCode")}</div>
+                      <div className="mt-0.5 text-xs text-gray-500 dark:text-zinc-400">{tCouponForm("qrCodeDescription")}</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Coupon Modal - Always available */}
             {showForm && (
               <div 
                 className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4"
                 onClick={(e) => {
                   if (e.target === e.currentTarget) {
                     setShowForm(false)
+                    setEditingCouponId(null) // Clear editing state when closing
                   }
                 }}
               >
@@ -1980,17 +2259,30 @@ export default function BusinessDashboard() {
                   <div className="relative flex items-center justify-between border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-4 py-4 sm:px-6 sm:py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
-                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M12 4v16m8-8H4" />
-                  </svg>
+                        {editingCouponId ? (
+                          <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M12 4v16m8-8H4" />
+                          </svg>
+                        )}
                 </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">Create New Coupon</h3>
-                        <p className="mt-0.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400 truncate">Add a new discount offer to your business</p>
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                          {editingCouponId ? "Edit Coupon" : "Create New Coupon"}
+                        </h3>
+                        <p className="mt-0.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400 truncate">
+                          {editingCouponId ? "Update your coupon details" : "Add a new discount offer to your business"}
+                        </p>
               </div>
                   </div>
                     <button
-                      onClick={() => setShowForm(false)}
+                      onClick={() => {
+                        setShowForm(false)
+                        setEditingCouponId(null) // Clear editing state when closing
+                      }}
                       className="ml-2 flex-shrink-0 rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:scale-95 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 touch-manipulation"
                       aria-label="Close modal"
                     >
@@ -2001,62 +2293,62 @@ export default function BusinessDashboard() {
               </div>
 
                   {/* Form Content - Scrollable */}
-                  <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-6">
                     {/* Error/Success Message */}
-                    {message && (
-                      <div className={`mb-6 animate-in slide-in-from-top-2 fade-in duration-300 rounded-xl border-2 p-4 ${
-                        message.type === 'success' 
-                          ? 'border-green-300 bg-green-50 text-green-900 dark:border-green-700 dark:bg-green-900/30 dark:text-green-200'
-                          : 'border-orange-300 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-200'
-                      }`}>
+              {message && (
+                <div className={`mb-6 animate-in slide-in-from-top-2 fade-in duration-300 rounded-xl border-2 p-4 ${
+                  message.type === 'success' 
+                    ? 'border-green-300 bg-green-50 text-green-900 dark:border-green-700 dark:bg-green-900/30 dark:text-green-200'
+                    : 'border-orange-300 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-200'
+                }`}>
                         <div className="flex items-start gap-3">
-                          {message.type === 'success' ? (
-                            <div className="flex-shrink-0 rounded-full bg-green-500 p-2">
-                              <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                          ) : (
-                            <div className="flex-shrink-0 rounded-full bg-orange-500 p-2">
-                              <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                              </svg>
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold leading-relaxed whitespace-pre-line break-words">{message.text}</p>
-                          </div>
-                        </div>
-                      </div>
+                    {message.type === 'success' ? (
+                      <div className="flex-shrink-0 rounded-full bg-green-500 p-2">
+                        <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                    ) : (
+                      <div className="flex-shrink-0 rounded-full bg-orange-500 p-2">
+                        <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
                     )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold leading-relaxed whitespace-pre-line break-words">{message.text}</p>
+                    </div>
+              </div>
+            </div>
+              )}
 
-                    <form id="create-coupon-form" onSubmit={handleSubmit} className="space-y-6">
-                      {/* Basic Information Card */}
-                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
-                        <div className="mb-6 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600">
-                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("basicInformation")}</h3>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("basicInformationDescription")}</p>
-                          </div>
-                        </div>
+              <form id="create-coupon-form" onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Information Card */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600">
+                      <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      </div>
+              <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("basicInformation")}</h3>
+                      <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("basicInformationDescription")}</p>
+                    </div>
+                  </div>
                         
-                        <div className="space-y-5">
-                          <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                              </svg>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
                               {tCouponForm("title")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.title}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
                               onChange={(e) => {
                                 setFormData({ ...formData, title: e.target.value })
                                 if (formErrors.title) {
@@ -2064,564 +2356,174 @@ export default function BusinessDashboard() {
                                 }
                               }}
                               placeholder="e.g., Summer Sale 2024"
-                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.title 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50 dark:bg-zinc-800/50'
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
                             />
                             {formErrors.title && (
-                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {formErrors.title}
                               </p>
                             )}
-                          </div>
+              </div>
 
-                          <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                              </svg>
+              <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                        </svg>
                               {tCouponForm("description")} <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                              required
+                </label>
+                <textarea
+                  required
                               rows={4}
-                              value={formData.description}
+                  value={formData.description}
                               onChange={(e) => {
                                 setFormData({ ...formData, description: e.target.value })
                                 if (formErrors.description) {
                                   setFormErrors({ ...formErrors, description: undefined })
                                 }
                               }}
-                              placeholder="Describe your coupon offer in detail. What makes it special?"
-                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none ${
+                        placeholder="Describe your coupon offer in detail. What makes it special?"
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none ${
                                 formErrors.description 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50 dark:bg-zinc-800/50'
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
                             />
                             {formErrors.description && (
-                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                            </svg>
                                 {formErrors.description}
                               </p>
                             )}
                           </div>
                         </div>
-                      </div>
+              </div>
 
-                      {/* Coupon Details Card */}
-                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
-                        <div className="mb-6 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
-                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("couponDetails")}</h3>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("couponDetailsDescription")}</p>
-                          </div>
+                {/* Coupon Details Card */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                      <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                         </div>
+                <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("couponDetails")}</h3>
+                      <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("couponDetailsDescription")}</p>
+                    </div>
+                  </div>
 
-                        {/* Coupon Type Selection */}
-                        <div className="mb-6">
-                          <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                            <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                            </svg>
-                            {tCouponForm("couponType")} <span className="text-red-500">*</span>
-                          </label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData({ ...formData, couponType: "ONLINE_CODE" })
-                                if (formErrors.code) {
-                                  setFormErrors({ ...formErrors, code: undefined })
-                                }
-                              }}
-                              className={`group relative rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                                formData.couponType === "ONLINE_CODE"
-                                  ? "border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 text-violet-700 shadow-md shadow-violet-500/10 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20 dark:text-violet-300"
-                                  : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:bg-violet-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
-                              }`}
-                            >
-                              <div className="flex flex-col items-center gap-2">
-                                <svg className={`h-6 w-6 transition-transform ${formData.couponType === "ONLINE_CODE" ? "scale-110" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                                </svg>
-                                <span>{tCouponForm("onlineCode")}</span>
-                              </div>
-                              {formData.couponType === "ONLINE_CODE" && (
-                                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600">
-                                  <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </div>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData({ ...formData, couponType: "QR_CODE", code: "" })
-                                if (formErrors.code) {
-                                  setFormErrors({ ...formErrors, code: undefined })
-                                }
-                              }}
-                              className={`group relative rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
-                                formData.couponType === "QR_CODE"
-                                  ? "border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 text-violet-700 shadow-md shadow-violet-500/10 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20 dark:text-violet-300"
-                                  : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:bg-violet-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
-                              }`}
-                            >
-                              <div className="flex flex-col items-center gap-2">
-                                <svg className={`h-6 w-6 transition-transform ${formData.couponType === "QR_CODE" ? "scale-110" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                                </svg>
-                                <span>{tCouponForm("qrCode")}</span>
-                              </div>
-                              {formData.couponType === "QR_CODE" && (
-                                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600">
-                                  <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </div>
-                              )}
-                            </button>
-                          </div>
-                          <div className="mt-3 rounded-lg bg-violet-50/50 p-3 dark:bg-violet-900/10">
-                            <p className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400">
-                              <svg className="h-4 w-4 flex-shrink-0 text-violet-600 dark:text-violet-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  {/* Coupon Type Display (Read-only) */}
+                  <div className="mb-6">
+                    <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      {tCouponForm("couponType")}
+                    </label>
+                    <div className="rounded-xl border-2 border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 p-4 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20">
+                      <div className="flex items-center gap-3">
+                        {formData.couponType === "ONLINE_CODE" ? (
+                          <>
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                               </svg>
-                              <span>{formData.couponType === "ONLINE_CODE" 
-                                ? tCouponForm("onlineCodeDescription")
-                                : tCouponForm("qrCodeDescription")}</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-5 sm:grid-cols-2">
-                          {formData.couponType === "ONLINE_CODE" && (
-                            <div>
-                              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                </svg>
-                                {tCouponForm("code")} <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                required={formData.couponType === "ONLINE_CODE"}
-                                value={formData.code}
-                                onChange={(e) => {
-                                  setFormData({ ...formData, code: e.target.value })
-                                  if (formErrors.code) {
-                                    setFormErrors({ ...formErrors, code: undefined })
-                                  }
-                                }}
-                                placeholder="SAVE20"
-                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base font-semibold text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
-                                  formErrors.code 
-                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                    : 'bg-gray-50 dark:bg-zinc-800/50'
-                                }`}
-                              />
-                              {formErrors.code && (
-                                <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                  <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  {formErrors.code}
-                                </p>
-                              )}
                             </div>
-                          )}
-
-                          <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            <div className="flex-1">
+                              <div className="font-semibold text-violet-700 dark:text-violet-300">{tCouponForm("onlineCode")}</div>
+                              <div className="text-xs text-gray-600 dark:text-zinc-400">{tCouponForm("onlineCodeDescription")}</div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                               </svg>
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-violet-700 dark:text-violet-300">{tCouponForm("qrCode")}</div>
+                              <div className="text-xs text-gray-600 dark:text-zinc-400">{tCouponForm("qrCodeDescription")}</div>
+                            </div>
+                          </>
+                        )}
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {formData.couponType === "ONLINE_CODE" && (
+                      <div>
+                        <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          </svg>
+                              {tCouponForm("code")} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                          required={formData.couponType === "ONLINE_CODE"}
+                    value={formData.code}
+                              onChange={(e) => {
+                                setFormData({ ...formData, code: e.target.value })
+                                if (formErrors.code) {
+                                  setFormErrors({ ...formErrors, code: undefined })
+                                }
+                              }}
+                          placeholder="e.g., SUMMER2024"
+                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                formErrors.code 
+                                  ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                              : 'bg-gray-50 dark:bg-zinc-800/50'
+                              }`}
+                            />
+                            {formErrors.code && (
+                          <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                            <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {formErrors.code}
+                              </p>
+                            )}
+                </div>
+                    )}
+
+                <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
                               {tCouponForm("category")} <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                              required
-                              value={formData.categoryId}
+                  </label>
+                  <select
+                    required
+                    value={formData.categoryId}
                               onChange={(e) => {
                                 setFormData({ ...formData, categoryId: e.target.value })
                                 if (formErrors.categoryId) {
                                   setFormErrors({ ...formErrors, categoryId: undefined })
                                 }
                               }}
-                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
                                 formErrors.categoryId 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50 dark:bg-zinc-800/50'
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
                               }`}
-                            >
-                              <option value="">Select category</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {locale === "el" ? category.nameEl : category.nameEn}
-                                </option>
-                              ))}
-                            </select>
-                            {formErrors.categoryId && (
-                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {formErrors.categoryId}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="number"
-                                required
-                                min="1"
-                                max="100"
-                                value={formData.discountPercentage}
-                                onChange={(e) => {
-                                  setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || 0 })
-                                  if (formErrors.discountPercentage) {
-                                    setFormErrors({ ...formErrors, discountPercentage: undefined })
-                                  }
-                                }}
-                                placeholder="20"
-                                className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
-                                  formErrors.discountPercentage 
-                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                    : 'bg-gray-50 dark:bg-zinc-800/50'
-                                }`}
-                              />
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
-                            </div>
-                            {formErrors.discountPercentage && (
-                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {formErrors.discountPercentage}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              {tCouponForm("expirationDate")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="date"
-                              required
-                              value={formData.expirationDate}
-                              onChange={(e) => {
-                                setFormData({ ...formData, expirationDate: e.target.value })
-                                if (formErrors.expirationDate) {
-                                  setFormErrors({ ...formErrors, expirationDate: undefined })
-                                }
-                              }}
-                              min={new Date().toISOString().split('T')[0]}
-                              className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
-                                formErrors.expirationDate 
-                                  ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                                  : 'bg-gray-50 dark:bg-zinc-800/50'
-                              }`}
-                            />
-                            {formErrors.expirationDate && (
-                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {formErrors.expirationDate}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Image Upload Card */}
-                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
-                        <div className="mb-6 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
-                            <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("imageSectionTitle")}</h3>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("imageSectionDescription")}</p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          {!formData.imagePath ? (
-                            <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8 transition-all hover:border-violet-400 hover:bg-violet-50/30 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/jpg,image/png,image/webp"
-                                onChange={handleImageUpload}
-                                disabled={uploadingImage}
-                                className="hidden"
-                              />
-                              {uploadingImage ? (
-                                <div className="flex flex-col items-center gap-3">
-                                  <svg className="h-12 w-12 animate-spin text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                  </svg>
-                                  <span className="text-sm font-medium text-violet-700 dark:text-violet-300">{tCommon("loading")}...</span>
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
-                                    <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                  </div>
-                                  <p className="mb-1 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                                    {tCouponForm("clickToUpload")}
-                                  </p>
-                                  <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                    {tCouponForm("imageFormats")}
-                                  </p>
-                                </>
-                              )}
-                            </label>
-                          ) : (
-                            <div className="group relative overflow-hidden rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:from-zinc-800/50 dark:to-zinc-800/30">
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-4 flex-1 min-w-0">
-                                  <div className="relative flex-shrink-0 overflow-hidden rounded-lg">
-                                    <img
-                                      src={formData.imagePath}
-                                      alt="Preview"
-                                      className="h-20 w-20 object-cover ring-2 ring-gray-200 dark:ring-zinc-700"
-                                    />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{tCouponForm("imageUploaded")}</p>
-                                    <p className="text-xs text-gray-500 dark:text-zinc-400">{tCouponForm("readyToUse")}</p>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setFormData({ ...formData, imagePath: "" })}
-                                  className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                                >
-                                  <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-            </form>
-          </div>
-
-                  {/* Footer with Actions */}
-                  <div className="sticky bottom-0 flex flex-col gap-3 border-t border-gray-200/50 bg-white/95 backdrop-blur-sm px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-5 dark:border-zinc-800 dark:bg-zinc-900/95">
-                    <p className="hidden text-xs font-medium text-gray-500 dark:text-zinc-400 sm:block">
-                      <span className="text-red-500">*</span> Required fields
-                    </p>
-                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowForm(false)}
-                        className="w-full rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:border-zinc-600 sm:w-auto"
-                      >
-                        {tCommon("cancel")}
-                      </button>
-                      <button
-                        type="submit"
-                        form="create-coupon-form"
-                        disabled={submitting || uploadingImage}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700 sm:w-auto"
-                      >
-                        {submitting ? (
-                          <>
-                            <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            <span>{tCouponForm("creating")}</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span>{tCouponForm("submit")}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-          </div>
-        )}
-
-            {/* Filter Tabs */}
-            <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex gap-1 p-1">
-                {(["ALL", "PENDING", "APPROVED", "REJECTED"] as FilterStatus[]).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                      filterStatus === status
-                        ? "bg-violet-600 text-white shadow-sm"
-                        : "text-gray-600 hover:bg-gray-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    {status === "ALL" ? "All Coupons" : t(status.toLowerCase())}
-                    {status !== "ALL" && (
-                      <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        filterStatus === status
-                          ? "bg-white/20"
-                          : "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      }`}>
-                        {stats[status.toLowerCase() as keyof typeof stats]}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-        {/* Edit Coupon Form */}
-        {editingCouponId && (
-              <div className="mb-6 rounded-2xl bg-white p-6 dark:bg-zinc-900/50">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Coupon</h3>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Update your coupon details</p>
-                </div>
-                <form onSubmit={handleUpdateCoupon} className="space-y-5">
-              <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                      {tCouponForm("title")} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="Enter coupon title"
-                      className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
-                />
-              </div>
-
-              <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                      {tCouponForm("description")} <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  required
-                      rows={4}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Describe your coupon offer..."
-                      className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
-                />
-              </div>
-
-              {/* Coupon Type Selection */}
-              <div className="mb-4">
-                <label className="mb-3 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                  {tCouponForm("couponType")} <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, couponType: "ONLINE_CODE" })
-                    }}
-                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                      formData.couponType === "ONLINE_CODE"
-                        ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                      {tCouponForm("onlineCode")}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, couponType: "QR_CODE", code: "" })
-                    }}
-                    className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                      formData.couponType === "QR_CODE"
-                        ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                      </svg>
-                      {tCouponForm("qrCode")}
-                    </div>
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">
-                  {formData.couponType === "ONLINE_CODE" 
-                    ? tCouponForm("onlineCodeDescription")
-                    : tCouponForm("qrCodeDescription")}
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {formData.couponType === "ONLINE_CODE" && (
-                <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                        {tCouponForm("code")} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required={formData.couponType === "ONLINE_CODE"}
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                        placeholder="SAVE20"
-                        className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
-                  />
-                </div>
-                )}
-
-                <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                        {tCouponForm("category")} <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                        className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
                   >
                     <option value="">Select category</option>
                     {categories.map((category) => (
@@ -2630,268 +2532,505 @@ export default function BusinessDashboard() {
                       </option>
                     ))}
                   </select>
-                </div>
+                            {formErrors.categoryId && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {formErrors.categoryId}
+                              </p>
+                            )}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                        {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                              {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
                   </label>
-                      <div className="relative">
+                        <div className="relative">
                   <input
                     type="number"
                     required
                     min="1"
                     max="100"
                     value={formData.discountPercentage}
-                          onChange={(e) => setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || 0 })}
-                          placeholder="20"
-                          className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 pr-8 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
-                  />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-zinc-400">%</span>
-                      </div>
+                                onChange={(e) => {
+                                  setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || 0 })
+                                  if (formErrors.discountPercentage) {
+                                    setFormErrors({ ...formErrors, discountPercentage: undefined })
+                                  }
+                                }}
+                                placeholder="20"
+                          className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                  formErrors.discountPercentage 
+                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                              : 'bg-gray-50 dark:bg-zinc-800/50'
+                                }`}
+                              />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
+                        </div>
+                            {formErrors.discountPercentage && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                                {formErrors.discountPercentage}
+                              </p>
+                            )}
                 </div>
 
                 <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                        {tCouponForm("expirationDate")} <span className="text-red-500">*</span>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                              {tCouponForm("expirationDate")} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={formData.expirationDate}
-                    onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
-                        min={new Date().toISOString().split('T')[0]}
-                        className="block w-full rounded-lg border-0 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:bg-zinc-800"
-                  />
+                              onChange={(e) => {
+                                setFormData({ ...formData, expirationDate: e.target.value })
+                                if (formErrors.expirationDate) {
+                                  setFormErrors({ ...formErrors, expirationDate: undefined })
+                                }
+                              }}
+                              min={new Date().toISOString().split('T')[0]}
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                formErrors.expirationDate 
+                                  ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
+                              }`}
+                            />
+                            {formErrors.expirationDate && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                                {formErrors.expirationDate}
+                              </p>
+                            )}
+                          </div>
                 </div>
               </div>
 
+                {/* Usage Limits Card */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600">
+                      <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("usageLimits")}</h3>
+                      <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("usageLimitsDescription")}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {tCouponForm("usageLimitType")} <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={formData.usageLimitType}
+                        onChange={(e) => {
+                          const newType = e.target.value as "SINGLE_USE" | "MULTIPLE_USE" | "UNLIMITED"
+                          setFormData({ 
+                            ...formData, 
+                            usageLimitType: newType,
+                            maxUsesPerUser: newType === "MULTIPLE_USE" ? formData.maxUsesPerUser : undefined
+                          })
+                          if (formErrors.maxUsesPerUser) {
+                            setFormErrors({ ...formErrors, maxUsesPerUser: undefined })
+                          }
+                        }}
+                        className="block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-gray-50 dark:bg-zinc-800/50"
+                      >
+                        <option value="SINGLE_USE">{tCouponForm("singleUse")}</option>
+                        <option value="MULTIPLE_USE">{tCouponForm("multipleUses")}</option>
+                        <option value="UNLIMITED">{tCouponForm("unlimited")}</option>
+                      </select>
+                    </div>
+
+                    {formData.usageLimitType === "MULTIPLE_USE" && (
+                      <div>
+                        <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                          </svg>
+                          {tCouponForm("maxUsesPerUser")} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={formData.maxUsesPerUser || ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : undefined
+                            setFormData({ ...formData, maxUsesPerUser: value })
+                            if (formErrors.maxUsesPerUser) {
+                              setFormErrors({ ...formErrors, maxUsesPerUser: undefined })
+                            }
+                          }}
+                          placeholder="e.g., 5"
+                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                            formErrors.maxUsesPerUser 
+                              ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                              : 'bg-gray-50 dark:bg-zinc-800/50'
+                          }`}
+                        />
+                        {formErrors.maxUsesPerUser && (
+                          <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                            <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {formErrors.maxUsesPerUser}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* QR Validity Schedule Card - Only for QR_CODE coupons */}
+                {formData.couponType === "QR_CODE" && (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <div className="mb-6 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
+                        <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("qrValiditySchedule")}</h3>
+                        <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("qrValidityScheduleDescription")}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div>
+                        <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {tCouponForm("enableTimeRestrictions")}
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({ 
+                                ...formData, 
+                                hasTimeRestrictions: true 
+                              })
+                            }}
+                            className={`flex-1 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                              formData.hasTimeRestrictions
+                                ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+                            }`}
+                          >
+                            YES
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({ 
+                                ...formData, 
+                                hasTimeRestrictions: false,
+                                validDays: [],
+                                validStartHour: undefined,
+                                validEndHour: undefined
+                              })
+                              setFormErrors({
+                                ...formErrors,
+                                validDays: undefined,
+                                validStartHour: undefined,
+                                validEndHour: undefined
+                              })
+                            }}
+                            className={`flex-1 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                              !formData.hasTimeRestrictions
+                                ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+                            }`}
+                          >
+                            NO
+                          </button>
+                        </div>
+                      </div>
+
+                      {formData.hasTimeRestrictions && (
+                        <>
+                          <div>
+                            <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              {tCouponForm("validDays")} <span className="text-red-500">*</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                              {[
+                                { value: 1, label: tCouponForm("monday") },
+                                { value: 2, label: tCouponForm("tuesday") },
+                                { value: 3, label: tCouponForm("wednesday") },
+                                { value: 4, label: tCouponForm("thursday") },
+                                { value: 5, label: tCouponForm("friday") },
+                                { value: 6, label: tCouponForm("saturday") },
+                                { value: 0, label: tCouponForm("sunday") },
+                              ].map((day) => (
+                                <label
+                                  key={day.value}
+                                  className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                                    formData.validDays?.includes(day.value)
+                                      ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.validDays?.includes(day.value) || false}
+                                    onChange={(e) => {
+                                      const currentDays = formData.validDays || []
+                                      const newDays = e.target.checked
+                                        ? [...currentDays, day.value]
+                                        : currentDays.filter((d) => d !== day.value)
+                                      setFormData({ ...formData, validDays: newDays })
+                                      if (formErrors.validDays) {
+                                        setFormErrors({ ...formErrors, validDays: undefined })
+                                      }
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                                  />
+                                  {day.label}
+                                </label>
+                              ))}
+                            </div>
+                            {formErrors.validDays && (
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {formErrors.validDays}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="grid gap-5 sm:grid-cols-2">
+                            <div>
+                              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {tCouponForm("startHour")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                required
+                                min="0"
+                                max="23"
+                                value={formData.validStartHour ?? ""}
+                                onChange={(e) => {
+                                  const value = e.target.value ? parseInt(e.target.value) : undefined
+                                  setFormData({ ...formData, validStartHour: value })
+                                  if (formErrors.validStartHour) {
+                                    setFormErrors({ ...formErrors, validStartHour: undefined })
+                                  }
+                                }}
+                                placeholder="0-23"
+                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                  formErrors.validStartHour 
+                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                                    : 'bg-gray-50 dark:bg-zinc-800/50'
+                                }`}
+                              />
+                              {formErrors.validStartHour && (
+                                <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                  <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  {formErrors.validStartHour}
+                                </p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {tCouponForm("endHour")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                required
+                                min="0"
+                                max="23"
+                                value={formData.validEndHour ?? ""}
+                                onChange={(e) => {
+                                  const value = e.target.value ? parseInt(e.target.value) : undefined
+                                  setFormData({ ...formData, validEndHour: value })
+                                  if (formErrors.validEndHour) {
+                                    setFormErrors({ ...formErrors, validEndHour: undefined })
+                                  }
+                                }}
+                                placeholder="0-23"
+                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                  formErrors.validEndHour 
+                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                                    : 'bg-gray-50 dark:bg-zinc-800/50'
+                                }`}
+                              />
+                              {formErrors.validEndHour && (
+                                <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                  <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  {formErrors.validEndHour}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Upload Card */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
+                      <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
               <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-zinc-300">
-                      {tCouponForm("image")} <span className="text-xs text-gray-500 dark:text-zinc-400">(Optional)</span>
-                </label>
-                    <div className="space-y-3">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tCouponForm("imageSectionTitle")}</h3>
+                      <p className="text-sm text-gray-500 dark:text-zinc-400">{tCouponForm("imageSectionDescription")}</p>
+                          </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {!formData.imagePath ? (
+                      <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8 transition-all hover:border-violet-400 hover:bg-violet-50/30 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">
                 <input
                   type="file"
                   accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={handleImageUpload}
                   disabled={uploadingImage}
-                        className="block w-full text-sm text-gray-900 file:mr-4 file:rounded-lg file:border-0 file:bg-violet-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-violet-700 transition hover:file:bg-violet-200 dark:text-zinc-100 dark:file:bg-violet-900/30 dark:file:text-violet-300"
-                />
-                {uploadingImage && (
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
-                          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span>{tCommon("loading")}...</span>
-                        </div>
-                )}
-                {formData.imagePath && (
-                        <div className="mt-2 rounded-lg border border-gray-200 p-3 dark:border-zinc-800">
+                          className="hidden"
+                        />
+                        {uploadingImage ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <svg className="h-12 w-12 animate-spin text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                                <span className="text-sm font-medium text-violet-700 dark:text-violet-300">{tCommon("loading")}...</span>
+                      </div>
+                        ) : (
+                          <>
+                            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
+                              <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                </div>
+                            <p className="mb-1 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                              {tCouponForm("clickToUpload")}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400">
+                              {tCouponForm("imageFormats")}
+                            </p>
+                          </>
+                        )}
+                      </label>
+                    ) : (
+                      <div className="group relative overflow-hidden rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:from-zinc-800/50 dark:to-zinc-800/30">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <div className="relative flex-shrink-0 overflow-hidden rounded-lg">
                     <img
                       src={formData.imagePath}
                       alt="Preview"
-                            className="h-32 w-auto rounded-lg object-cover"
-                    />
+                                className="h-20 w-20 object-cover ring-2 ring-gray-200 dark:ring-zinc-700"
+                                    />
+                    </div>
+                                  <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white">{tCouponForm("imageUploaded")}</p>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">{tCouponForm("readyToUse")}</p>
+                  </div>
+                    </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, imagePath: "" })}
+                            className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                >
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                                </button>
+              </div>
                   </div>
                 )}
               </div>
-              </div>
-
-                  <div className="flex items-center justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting || uploadingImage}
-                      className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-violet-500 dark:hover:bg-violet-600"
-                    >
-                      {submitting ? (
-                        <>
-                          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>{tCommon("save")}</span>
-                        </>
-                      )}
-                    </button>
-              </div>
+                    </div>
             </form>
           </div>
-        )}
 
-        {/* Coupons List */}
-        {loading ? (
-          <CouponsListSkeleton />
-        ) : filteredCoupons.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-16 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-              <svg className="h-8 w-8 text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              {filterStatus === "ALL" ? "No coupons yet" : `No ${filterStatus.toLowerCase()} coupons`}
-            </h3>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              {filterStatus === "ALL" && "Create your first coupon to get started!"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredCoupons.map((coupon) => (
-              <div
-                key={coupon.id}
-                className={`rounded-xl border bg-white p-6 shadow-sm transition dark:bg-zinc-900 ${
-                  editingCouponId === coupon.id
-                    ? 'border-amber-300 ring-2 ring-amber-200 dark:border-amber-700 dark:ring-amber-900/30'
-                    : 'border-zinc-200 dark:border-zinc-800'
-                }`}
-              >
-                <div className="flex gap-6">
-                  {/* Image */}
-                  {coupon.imagePath && (
-                    <div className="hidden sm:block">
-                      <img
-                        src={coupon.imagePath}
-                        alt={coupon.title}
-                        className="h-32 w-48 rounded-lg object-cover"
-                      />
-                    </div>
-                  )}
-
-                  {/* Content */}
-                  <div className="flex-1">
-                    <div className="mb-3 flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="mb-2 flex items-center gap-3">
-                          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                            {coupon.title}
-                          </h3>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(coupon.status)}`}>
-                            {t(coupon.status.toLowerCase())}
-                          </span>
-                        </div>
-                        <p className="mb-3 text-sm text-zinc-700 dark:text-zinc-300">
-                          {coupon.description}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                          <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                            <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            Code: <strong>{coupon.code || "N/A"}</strong>
-                          </span>
-                          <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                            {coupon.discountPercentage}% OFF
-                          </span>
-                          <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                            <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Expires: {formatExpirationDate(coupon.expirationDate, locale)}
-                          </span>
-                          <span className="text-zinc-500 dark:text-zinc-400">
-                            {locale === "el" ? coupon.category.nameEl : coupon.category.nameEn}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-1">
-                        {(coupon.status === "PENDING" || coupon.status === "APPROVED") && (
-                          <button
-                            onClick={() => handleEditCoupon(coupon)}
-                            className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                            title="Edit coupon"
-                          >
-                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        )}
-
-                        {coupon.status === "REJECTED" && (
+                  {/* Footer with Actions */}
+            <div className="sticky bottom-0 flex flex-col gap-3 border-t border-gray-200/50 bg-white/95 backdrop-blur-sm px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-5 dark:border-zinc-800 dark:bg-zinc-900/95">
+                    <p className="hidden text-xs font-medium text-gray-500 dark:text-zinc-400 sm:block">
+                      <span className="text-red-500">*</span> Required fields
+                    </p>
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowForm(false)
+                          setEditingCouponId(null) // Clear editing state when canceling
+                        }}
+                  className="w-full rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:border-zinc-600 sm:w-auto"
+                      >
+                  {tCommon("cancel")}
+                      </button>
+                      <button
+                        type="submit"
+                        form="create-coupon-form"
+                        disabled={submitting || uploadingImage}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700 sm:w-auto"
+                      >
+                        {submitting ? (
                           <>
-                            <button
-                              onClick={() => handleEditCoupon(coupon)}
-                              className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                              title="Edit and resubmit"
-                            >
-                              <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleResubmitCoupon(coupon.id)}
-                              disabled={resubmittingCouponId === coupon.id}
-                              className="rounded-lg p-2 text-green-600 transition-colors hover:bg-green-100 disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-900/30"
-                              title="Resubmit for approval"
-                            >
-                              {resubmittingCouponId === coupon.id ? (
-                                <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                              ) : (
-                                <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                              )}
-                            </button>
-                          </>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Are you sure you want to delete "${coupon.title}"?`)) {
-                              handleDeleteCoupon(coupon.id)
-                            }
-                          }}
-                          disabled={deletingCouponId === coupon.id}
-                          className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                          title="Delete coupon"
-                        >
-                          {deletingCouponId === coupon.id ? (
                             <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                          ) : (
-                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                </svg>
+                      <span>{editingCouponId ? "Saving..." : tCouponForm("creating")}</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M5 13l4 4L19 7" />
+                </svg>
+                            <span>{editingCouponId ? tCouponForm("update") : tCouponForm("submit")}</span>
+                          </>
+              )}
+                      </button>
+            </div>
+          </div>
                 </div>
-              </div>
-            ))}
           </div>
         )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </main>
 
       {showQRScanner && (
         <QRScanner 
@@ -2907,7 +3046,7 @@ export default function BusinessDashboard() {
       )}
 
       {/* Floating QR Scanner Button - Always visible */}
-      <button
+                    <button
         onClick={() => setShowQRScanner(true)}
         className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-indigo-600 p-2.5 sm:p-3 text-white shadow-lg transition hover:bg-indigo-700 hover:scale-105 active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600 touch-manipulation"
         title={t("scanQRButton") || "Scan QR Code"}
@@ -2915,8 +3054,8 @@ export default function BusinessDashboard() {
       >
         <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
           <path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-        </svg>
-      </button>
+                          </svg>
+                    </button>
     </div>
   )
 }
