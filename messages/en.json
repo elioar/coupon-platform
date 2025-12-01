@@ -324,7 +324,8 @@
       "coupons": "My Coupons",
       "insights": "Insights",
       "users": "Users",
-      "categories": "Categories"
+      "categories": "Categories",
+      "referBusiness": "Refer a Business"
     },
     "header": {
       "notifications": "Notifications",
@@ -356,7 +357,33 @@
       "code": "Code",
       "savedCouponsDescription": "Your bookmarked coupons for easy access",
       "noSavedCoupons": "No saved coupons yet",
-      "noSavedCouponsDescription": "Start saving coupons you like by clicking the bookmark icon on any coupon card"
+      "noSavedCouponsDescription": "Start saving coupons you like by clicking the bookmark icon on any coupon card",
+      "referBusiness": {
+        "title": "Refer a Business",
+        "subtitle": "Invite businesses to join and earn 1 month free membership",
+        "description": "Share your personal invite link with businesses. When they register and create their first active coupon, you'll get 1 month of free membership!",
+        "inviteLink": "Your Invite Link",
+        "copyLink": "Copy Link",
+        "linkCopied": "Link copied!",
+        "invitedBusinesses": "Invited Businesses",
+        "noInvites": "You haven't invited any businesses yet",
+        "noInvitesDescription": "Share your invite link to start earning free membership months",
+        "businessName": "Business",
+        "status": "Status",
+        "invitedOn": "Invited",
+        "statusPending": "Pending",
+        "statusRegistered": "Registered",
+        "statusActive": "Active",
+        "rewards": "Rewards",
+        "freeMonthsEarned": "Free Months Earned",
+        "freeMonthsDescription": "Each active business referral earns you 1 month of free membership",
+        "stats": {
+          "total": "Total Invites",
+          "pending": "Pending",
+          "registered": "Registered",
+          "active": "Active"
+        }
+      }
     },
     "business": {
       "title": "Business Dashboard",
@@ -393,6 +420,32 @@
       "retry": "Try Again",
       "uploadImage": "Upload Image",
       "cameraTips": "Make sure you've granted camera permissions and that no other app is using the camera. Or upload a photo of the QR code.",
+      "referBusiness": {
+        "title": "Refer a Business",
+        "subtitle": "Invite businesses to join and earn 1 month free membership",
+        "description": "Share your personal invite link with businesses. When they register and create their first active coupon, you'll get 1 month of free membership!",
+        "inviteLink": "Your Invite Link",
+        "copyLink": "Copy Link",
+        "linkCopied": "Link copied!",
+        "invitedBusinesses": "Invited Businesses",
+        "noInvites": "You haven't invited any businesses yet",
+        "noInvitesDescription": "Share your invite link to start earning free membership months",
+        "businessName": "Business",
+        "status": "Status",
+        "invitedOn": "Invited",
+        "statusPending": "Pending",
+        "statusRegistered": "Registered",
+        "statusActive": "Active",
+        "rewards": "Rewards",
+        "freeMonthsEarned": "Free Months Earned",
+        "freeMonthsDescription": "Each active business referral earns you 1 month of free membership",
+        "stats": {
+          "total": "Total Invites",
+          "pending": "Pending",
+          "registered": "Registered",
+          "active": "Active"
+        }
+      },
       "stats": {
         "totalCoupons": "Total Coupons",
         "approved": "Approved",
@@ -558,7 +611,13 @@
     "onlineCodeDescription": "For online use - customers will enter a code",
     "qrCodeDescription": "For in-store use - customers will show a QR code",
     "category": "Category",
+    "discountType": "Discount Type",
     "discountPercentage": "Discount Percentage",
+    "discountAmount": "Discount Amount (€)",
+    "percent": "Percent (%)",
+    "fixed": "Fixed (-€)",
+    "bogo11": "1+1 (Buy 1 Get 1)",
+    "bogo21": "2+1 (Buy 2 Get 1)",
     "expirationDate": "Expiration Date",
     "image": "Coupon Image",
     "submit": "Create Coupon",

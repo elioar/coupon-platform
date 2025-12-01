@@ -25,6 +25,12 @@ enum CouponStatus {
   REJECTED
 }
 
+enum InviteStatus {
+  PENDING
+  REGISTERED
+  ACTIVE
+}
+
 enum CouponType {
   ONLINE_CODE
   QR_CODE
@@ -36,33 +42,42 @@ enum UsageLimitType {
   UNLIMITED
 }
 
+enum DiscountType {
+  PERCENT
+  FIXED
+  BOGO_1_1
+  BOGO_2_1
+}
+
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  password          String
-  name              String
-  address           String?
-  birthDate         DateTime?
-  phone             String?
-  about             String?   @db.Text
-  businessDescription String? @db.Text
-  businessCategories String[] @default([])
-  businessLocation  String?
-  businessWebsite   String?
-  businessInstagram String?
-  businessFacebook  String?
-  businessTikTok    String?
-  businessLatitude  Float?
-  businessLongitude Float?
-  role              Role      @default(USER)
-  membershipExpiry  DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  password            String
+  name                String
+  address             String?
+  birthDate           DateTime?
+  phone               String?
+  about               String?   @db.Text
+  businessDescription String?   @db.Text
+  businessCategories  String[]  @default([])
+  businessLocation    String?
+  businessWebsite     String?
+  businessInstagram   String?
+  businessFacebook    String?
+  businessTikTok      String?
+  businessLatitude    Float?
+  businessLongitude   Float?
+  role                Role      @default(USER)
+  membershipExpiry    DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
   // Relations
-  coupons           Coupon[]  @relation("BusinessCoupons")
+  coupons           Coupon[]           @relation("BusinessCoupons")
   couponRedemptions CouponRedemption[]
-  
+  sentInvites       BusinessInvite[]   @relation("InviterInvites")
+  receivedInvites   BusinessInvite[]   @relation("InvitedBusiness")
+
   @@index([email])
   @@index([role])
 }
@@ -73,40 +88,42 @@ model Category {
   nameEl    String   @unique
   slug      String   @unique
   createdAt DateTime @default(now())
-  
+
   // Relations
-  coupons   Coupon[]
-  
+  coupons Coupon[]
+
   @@index([slug])
 }
 
 model Coupon {
-  id                  String        @id @default(cuid())
+  id                  String         @id @default(cuid())
   businessId          String
   categoryId          String
   title               String
-  description         String        @db.Text
+  description         String         @db.Text
   code                String?
-  couponType          CouponType    @default(ONLINE_CODE)
+  couponType          CouponType     @default(ONLINE_CODE)
   imagePath           String?
-  discountPercentage  Int
+  discountType        DiscountType   @default(PERCENT)
+  discountPercentage  Int? // For PERCENT type
+  discountAmount      Float? // For FIXED type (in currency units)
   expirationDate      DateTime
-  status              CouponStatus  @default(PENDING)
+  status              CouponStatus   @default(PENDING)
   usageLimitType      UsageLimitType @default(SINGLE_USE)
   maxUsesPerUser      Int?
-  hasTimeRestrictions Boolean       @default(false)
-  validDays           Int[]         @default([])
+  hasTimeRestrictions Boolean        @default(false)
+  validDays           Int[]          @default([])
   validStartHour      Int?
   validEndHour        Int?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
   // Relations
-  business            User          @relation("BusinessCoupons", fields: [businessId], references: [id], onDelete: Cascade)
-  category            Category      @relation(fields: [categoryId], references: [id])
-  analytics           CouponAnalytics[]
-  redemptions         CouponRedemption[]
-  
+  business    User               @relation("BusinessCoupons", fields: [businessId], references: [id], onDelete: Cascade)
+  category    Category           @relation(fields: [categoryId], references: [id])
+  analytics   CouponAnalytics[]
+  redemptions CouponRedemption[]
+
   @@index([businessId])
   @@index([categoryId])
   @@index([status])
@@ -114,16 +131,16 @@ model Coupon {
 }
 
 model CouponAnalytics {
-  id          String   @id @default(cuid())
-  couponId    String
-  eventType   String   // 'VIEW', 'CLICK', 'REDEMPTION'
-  userId      String?  // Optional - track which user (if authenticated)
-  ipAddress   String?  // Optional - for anonymous tracking
-  userAgent   String?  // Optional - browser/device info
-  createdAt   DateTime @default(now())
-  
-  coupon      Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  
+  id        String   @id @default(cuid())
+  couponId  String
+  eventType String // 'VIEW', 'CLICK', 'REDEMPTION'
+  userId    String? // Optional - track which user (if authenticated)
+  ipAddress String? // Optional - for anonymous tracking
+  userAgent String? // Optional - browser/device info
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
   @@index([couponId])
   @@index([eventType])
   @@index([createdAt])
@@ -137,13 +154,32 @@ model CouponRedemption {
   redemptionToken String    @unique
   redeemedAt      DateTime?
   createdAt       DateTime  @default(now())
-  
-  coupon          Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([redemptionToken])
   @@index([couponId])
   @@index([userId])
   @@index([redeemedAt])
   @@index([couponId, userId])
+}
+
+model BusinessInvite {
+  id                String       @id @default(cuid())
+  inviterId         String
+  invitedBusinessId String
+  status            InviteStatus @default(PENDING)
+  rewardGranted     Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  inviter         User @relation("InviterInvites", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitedBusiness User @relation("InvitedBusiness", fields: [invitedBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([inviterId, invitedBusinessId])
+  @@index([inviterId])
+  @@index([invitedBusinessId])
+  @@index([status])
 }

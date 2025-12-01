@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
@@ -47,12 +47,14 @@ type MessageState =
   | null
 
 export default function UserDashboard() {
-  const { data: session, update } = useSession()
+  const { data: session, update, status } = useSession()
+  const [refreshKey, setRefreshKey] = useState(0)
   const t = useTranslations("dashboard.user")
   const tProfile = useTranslations("profile")
   const tCommon = useTranslations("common")
   const tNav = useTranslations("nav")
   const tMembership = useTranslations("membership")
+  const tRefer = useTranslations("dashboard.user.referBusiness")
   const params = useParams()
   const searchParams = useSearchParams()
   const locale = params.locale as string
@@ -73,8 +75,52 @@ export default function UserDashboard() {
   })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<MessageState>(null)
+  const [invites, setInvites] = useState<any[]>([])
+  const [inviteStats, setInviteStats] = useState<any>(null)
+  const [loadingInvites, setLoadingInvites] = useState(true)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const lastRefreshedSection = useRef<string | null>(null)
+  const [dbMembershipExpiry, setDbMembershipExpiry] = useState<string | null>(null)
+  const [dbHasActiveMembership, setDbHasActiveMembership] = useState<boolean>(false)
 
-  const userIsMember = session?.user ? isMember(session.user) : false
+  // Recalculate membership status - use DB data if available, otherwise use session
+  const userIsMember = dbHasActiveMembership || (session?.user ? isMember(session.user) : false)
+  
+  // Fetch membership status directly from database (bypasses session cache)
+  const fetchMembershipStatus = async () => {
+    try {
+      const response = await fetch("/api/membership/status", { cache: "no-store" })
+      if (response.ok) {
+        const data = await response.json()
+        setDbMembershipExpiry(data.membershipExpiry)
+        setDbHasActiveMembership(data.hasActiveMembership)
+      }
+    } catch (error) {
+      // Silently fail
+    }
+  }
+  
+  // Fetch membership status when component mounts or section changes to membership
+  useEffect(() => {
+    if (section === "membership" || section === "referBusiness") {
+      fetchMembershipStatus()
+    }
+  }, [section])
+  
+  // Force re-evaluation when refreshKey changes (after membership update)
+  useEffect(() => {
+    if (refreshKey > 0) {
+      // Re-fetch membership status from DB after update
+      setTimeout(() => {
+        fetchMembershipStatus()
+      }, 600)
+    }
+  }, [refreshKey])
+
+  // Get invite link
+  const inviteLink = session?.user?.id
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/${locale}/register/business?invite=${session.user.id}`
+    : ""
 
   // Skeleton Loader Component
   const UserCouponsSkeleton = () => (
@@ -189,6 +235,147 @@ export default function UserDashboard() {
 
     fetchProfile()
   }, [session, section, tProfile])
+
+  // Automatically claim rewards when viewing membership section (removed from referBusiness to avoid auto-reload)
+  useEffect(() => {
+    const autoClaimRewards = async () => {
+      if (!session || lastRefreshedSection.current === section) {
+        return
+      }
+
+      // Only auto-claim on membership section, not referBusiness (to avoid reloads)
+      if (section === "membership") {
+        lastRefreshedSection.current = section
+        
+        try {
+          // Automatically check and claim rewards
+          const response = await fetch("/api/invites/check-membership", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            if (data.fixed && data.fixedCount > 0) {
+              // Wait for database update to complete
+              await new Promise(resolve => setTimeout(resolve, 500))
+              
+              // Refresh membership status directly from database (bypasses session cache)
+              await fetchMembershipStatus()
+              
+              // Also try to refresh session (but DB check is primary)
+              await update()
+              
+              // Force component re-render by updating refresh key
+              setRefreshKey(prev => prev + 1)
+            }
+          }
+        } catch (error) {
+          // Silently handle errors
+        }
+      }
+    }
+    
+    autoClaimRewards()
+  }, [section, session, update])
+
+  // Fetch invites for referBusiness section (also auto-claims rewards)
+  useEffect(() => {
+    const fetchInvites = async () => {
+      if (!session || section !== "referBusiness") {
+        setLoadingInvites(false)
+        return
+      }
+
+      try {
+        const response = await fetch("/api/invites")
+        if (response.ok) {
+          const data = await response.json()
+          setInvites(data.invites || [])
+          setInviteStats(data.stats || {})
+          
+          // If rewards were granted, refresh membership status after auto-fix
+          if (data.stats?.rewardsGranted > 0) {
+            // The API already auto-fixed, now refresh membership status from DB
+            setTimeout(async () => {
+              await fetchMembershipStatus()
+              await update()
+              // Force component re-render
+              setRefreshKey(prev => prev + 1)
+            }, 500)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching invites:", error)
+      } finally {
+        setLoadingInvites(false)
+      }
+    }
+
+    fetchInvites()
+  }, [session, section, update])
+
+  // Fetch invite stats for membership section (to check for earned rewards)
+  useEffect(() => {
+    const fetchInviteStats = async () => {
+      if (!session || section !== "membership" || inviteStats !== null) {
+        return
+      }
+
+      try {
+        const response = await fetch("/api/invites")
+        if (response.ok) {
+          const data = await response.json()
+          setInviteStats(data.stats || {})
+        }
+      } catch (error) {
+        console.error("Error fetching invite stats:", error)
+      }
+    }
+
+    fetchInviteStats()
+  }, [session, section, inviteStats])
+
+  const handleCopyLink = async () => {
+    if (!inviteLink || typeof window === "undefined") return
+
+    try {
+      // Try modern Clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(inviteLink)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2000)
+        return
+      }
+
+      // Fallback to older method
+      const textArea = document.createElement("textarea")
+      textArea.value = inviteLink
+      textArea.style.position = "fixed"
+      textArea.style.left = "-999999px"
+      textArea.style.top = "-999999px"
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        const successful = document.execCommand("copy")
+        if (successful) {
+          setLinkCopied(true)
+          setTimeout(() => setLinkCopied(false), 2000)
+        } else {
+          throw new Error("Copy command failed")
+        }
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    } catch (err) {
+      console.error("Failed to copy link:", err)
+      // Optionally show an error message to the user
+    }
+  }
 
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -553,9 +740,10 @@ export default function UserDashboard() {
           </div>
         )
 
-      case "membership":
-        const membershipExpiry = session?.user.membershipExpiry || null
-        const isActiveMember = membershipExpiry && new Date(membershipExpiry) > new Date()
+      case "membership": {
+        // Use DB membership data if available (more up-to-date), otherwise fall back to session
+        const membershipExpiry = dbMembershipExpiry || session?.user.membershipExpiry || null
+        const isActiveMember = dbHasActiveMembership || (membershipExpiry && new Date(membershipExpiry) > new Date())
 
         const daysUntilExpiry = membershipExpiry && isActiveMember
           ? Math.ceil((new Date(membershipExpiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
@@ -694,6 +882,7 @@ export default function UserDashboard() {
                       </p>
                     </div>
 
+
                     {/* Upgrade CTA */}
                     <a
                       href={`/${locale}/membership`}
@@ -738,6 +927,309 @@ export default function UserDashboard() {
             )}
           </div>
         )
+      }
+
+      case "referBusiness": {
+        const getStatusLabel = (status: string) => {
+          switch (status) {
+            case "PENDING":
+              return tRefer("statusPending")
+            case "REGISTERED":
+              return tRefer("statusRegistered")
+            case "ACTIVE":
+              return tRefer("statusActive")
+            default:
+              return status
+          }
+        }
+
+        const getStatusColor = (status: string) => {
+          switch (status) {
+            case "PENDING":
+              return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+            case "REGISTERED":
+              return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+            case "ACTIVE":
+              return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+            default:
+              return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+          }
+        }
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
+                {tRefer("title")}
+              </h1>
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 sm:text-base">
+                {tRefer("subtitle")}
+              </p>
+            </div>
+
+            {/* Invite Link Card */}
+            <div className="rounded-xl border border-zinc-200 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+              <h2 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                {tRefer("inviteLink")}
+              </h2>
+              <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+                {tRefer("description")}
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 break-all">
+                  {inviteLink || tCommon("loading")}
+                </div>
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                >
+                  {linkCopied ? (
+                    <>
+                      <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                      {tRefer("linkCopied")}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      {tRefer("copyLink")}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            {inviteStats && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {tRefer("stats.total")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {inviteStats.total || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {tRefer("stats.pending")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {inviteStats.pending || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {tRefer("stats.registered")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {inviteStats.registered || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {tRefer("stats.active")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+                    {inviteStats.active || 0}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Rewards Card */}
+            {inviteStats && inviteStats.rewardsGranted > 0 && (
+              <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-white p-6 shadow-sm dark:border-green-800 dark:from-green-950/20 dark:to-zinc-900">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
+                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                      {tRefer("freeMonthsEarned")}
+                    </h3>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {inviteStats.rewardsGranted} {inviteStats.rewardsGranted === 1 ? "month" : "months"}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                      {tRefer("freeMonthsDescription")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Invited Businesses List */}
+            <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                  {tRefer("invitedBusinesses")}
+                </h2>
+              </div>
+              {loadingInvites ? (
+                <div className="p-8 text-center text-zinc-600 dark:text-zinc-400">
+                  {tCommon("loading")}
+                </div>
+              ) : invites.length === 0 ? (
+                <div className="p-12 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
+                    <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                    {tRefer("noInvites")}
+                  </h3>
+                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    {tRefer("noInvitesDescription")}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {invites.map((invite) => {
+                    const status = invite.status
+                    const isPending = status === "PENDING"
+                    const isRegistered = status === "REGISTERED"
+                    const isActive = status === "ACTIVE"
+                    
+                    return (
+                      <div key={invite.id} className="p-6 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
+                                {invite.invitedBusiness?.name || "Unknown Business"}
+                              </h3>
+                              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                                {tRefer("invitedOn")}: {new Date(invite.createdAt).toLocaleDateString(locale, {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(invite.status)}`}>
+                                {getStatusLabel(invite.status)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Progress Steps */}
+                          <div className="mt-4">
+                            <div className="flex items-center gap-2">
+                              {/* Step 1: Invite Sent */}
+                              <div className="flex items-center gap-2">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                                  isPending || isRegistered || isActive
+                                    ? "border-green-500 bg-green-100 dark:bg-green-900/30"
+                                    : "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                                }`}>
+                                  {isPending || isRegistered || isActive ? (
+                                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">1</span>
+                                  )}
+                                </div>
+                                <span className={`text-xs font-medium ${
+                                  isPending || isRegistered || isActive
+                                    ? "text-green-700 dark:text-green-400"
+                                    : "text-zinc-500 dark:text-zinc-400"
+                                }`}>
+                                  Invite Sent
+                                </span>
+                              </div>
+                              
+                              {/* Line */}
+                              <div className={`h-0.5 flex-1 ${
+                                isRegistered || isActive
+                                  ? "bg-green-500"
+                                  : "bg-zinc-300 dark:bg-zinc-700"
+                              }`} />
+                              
+                              {/* Step 2: Registered */}
+                              <div className="flex items-center gap-2">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                                  isRegistered || isActive
+                                    ? "border-green-500 bg-green-100 dark:bg-green-900/30"
+                                    : "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                                }`}>
+                                  {isRegistered || isActive ? (
+                                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">2</span>
+                                  )}
+                                </div>
+                                <span className={`text-xs font-medium ${
+                                  isRegistered || isActive
+                                    ? "text-green-700 dark:text-green-400"
+                                    : "text-zinc-500 dark:text-zinc-400"
+                                }`}>
+                                  Registered
+                                </span>
+                              </div>
+                              
+                              {/* Line */}
+                              <div className={`h-0.5 flex-1 ${
+                                isActive
+                                  ? "bg-green-500"
+                                  : "bg-zinc-300 dark:bg-zinc-700"
+                              }`} />
+                              
+                              {/* Step 3: Active Coupon */}
+                              <div className="flex items-center gap-2">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                                  isActive
+                                    ? "border-green-500 bg-green-100 dark:bg-green-900/30"
+                                    : "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                                }`}>
+                                  {isActive ? (
+                                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">3</span>
+                                  )}
+                                </div>
+                                <span className={`text-xs font-medium ${
+                                  isActive
+                                    ? "text-green-700 dark:text-green-400"
+                                    : "text-zinc-500 dark:text-zinc-400"
+                                }`}>
+                                  Active Coupon
+                                </span>
+                              </div>
+                              
+                              {/* Reward indicator */}
+                              {isActive && (
+                                <div className="ml-2 flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 dark:bg-green-900/30">
+                                  <svg className="h-3 w-3 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span className="text-xs font-semibold text-green-700 dark:text-green-400">+1 Month</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
 
       case "settings":
         return (

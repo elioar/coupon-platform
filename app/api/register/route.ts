@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
-import { Role } from "@prisma/client"
+import { Role, InviteStatus } from "@prisma/client"
 
 const userSchema = z.object({
   name: z.string().min(2),
@@ -30,6 +30,7 @@ const businessSchema = z.object({
   logoUrl: z.string().optional().nullable(),
   businessLatitude: z.number().optional().nullable(),
   businessLongitude: z.number().optional().nullable(),
+  inviterId: z.string().optional(),
 })
 
 const registerSchema = z.discriminatedUnion("role", [userSchema, businessSchema])
@@ -92,6 +93,30 @@ export async function POST(request: NextRequest) {
         role: true,
       },
     })
+
+    // Handle invite if provided and this is a business registration
+    if (validatedData.role === "BUSINESS" && validatedData.inviterId) {
+      try {
+        // Verify inviter exists
+        const inviter = await prisma.user.findUnique({
+          where: { id: validatedData.inviterId },
+        })
+
+        if (inviter) {
+          // Create invite record with REGISTERED status
+          await prisma.businessInvite.create({
+            data: {
+              inviterId: validatedData.inviterId,
+              invitedBusinessId: user.id,
+              status: InviteStatus.REGISTERED,
+            },
+          })
+        }
+      } catch (error) {
+        // Log error but don't fail registration if invite handling fails
+        console.error("Error creating invite record:", error)
+      }
+    }
 
     return NextResponse.json(
       { message: "User created successfully", user },

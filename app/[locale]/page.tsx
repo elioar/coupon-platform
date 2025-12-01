@@ -24,7 +24,9 @@ interface Coupon {
   description: string;
   code: string | null;
   couponType: "ONLINE_CODE" | "QR_CODE";
-  discountPercentage: number;
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1";
+  discountPercentage?: number | null;
+  discountAmount?: number | null;
   expirationDate: string;
   imagePath: string | null;
   category: {
@@ -37,6 +39,27 @@ interface Coupon {
     name: string;
     email: string;
   };
+}
+
+const formatDiscount = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}%`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "1+1"
+    case "BOGO_2_1":
+      return "2+1"
+    default:
+      return `${coupon.discountPercentage || 0}%`
+  }
 }
 
 export default function HomePage({ params }: { params: Promise<{ locale: string }> }) {
@@ -444,11 +467,23 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            {coupon.discountPercentage}%
+                            {formatDiscount(coupon)}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            OFF
-                          </div>
+                          {(coupon.discountType === "PERCENT" || !coupon.discountType) && (
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              OFF
+                            </div>
+                          )}
+                          {(coupon.discountType === "FIXED") && (
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              OFF
+                            </div>
+                          )}
+                          {(coupon.discountType === "BOGO_1_1" || coupon.discountType === "BOGO_2_1") && (
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              FREE
+                            </div>
+                          )}
                         </div>
                       </Link>
                       </motion.div>

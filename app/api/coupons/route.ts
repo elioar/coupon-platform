@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
-import { CouponStatus, CouponType, UsageLimitType } from "@prisma/client"
+import { CouponStatus, CouponType, UsageLimitType, DiscountType } from "@prisma/client"
 
 const createCouponSchema = z.object({
   title: z.string().min(3).max(200),
@@ -13,7 +13,9 @@ const createCouponSchema = z.object({
   ),
   couponType: z.nativeEnum(CouponType).default(CouponType.ONLINE_CODE),
   categoryId: z.string(),
-  discountPercentage: z.number().min(1).max(100),
+  discountType: z.nativeEnum(DiscountType).default(DiscountType.PERCENT),
+  discountPercentage: z.number().min(1).max(100).optional(),
+  discountAmount: z.number().min(0.01).optional(),
   expirationDate: z.string().datetime(),
   imagePath: z.string().optional(),
   usageLimitType: z.nativeEnum(UsageLimitType).default(UsageLimitType.SINGLE_USE),
@@ -32,6 +34,20 @@ const createCouponSchema = z.object({
 }, {
   message: "Code is required for online coupons",
   path: ["code"]
+}).refine((data) => {
+  // If discountType is PERCENT, discountPercentage is required
+  if (data.discountType === DiscountType.PERCENT) {
+    return data.discountPercentage !== undefined && data.discountPercentage >= 1 && data.discountPercentage <= 100
+  }
+  // If discountType is FIXED, discountAmount is required
+  if (data.discountType === DiscountType.FIXED) {
+    return data.discountAmount !== undefined && data.discountAmount > 0
+  }
+  // BOGO types don't need discount values
+  return true
+}, {
+  message: "Discount value is required and must be valid for the selected discount type",
+  path: ["discountPercentage"]
 }).refine((data) => {
   // If usageLimitType is MULTIPLE_USE, maxUsesPerUser must be provided and >= 1
   if (data.usageLimitType === UsageLimitType.MULTIPLE_USE) {
@@ -181,6 +197,12 @@ export async function POST(request: NextRequest) {
       validEndHour: validatedData.hasTimeRestrictions
         ? validatedData.validEndHour
         : undefined,
+      discountPercentage: validatedData.discountType === DiscountType.PERCENT
+        ? validatedData.discountPercentage
+        : null,
+      discountAmount: validatedData.discountType === DiscountType.FIXED
+        ? validatedData.discountAmount
+        : null,
       businessId: user.id,
       expirationDate: new Date(validatedData.expirationDate),
       status: CouponStatus.PENDING,

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { useForm, Controller } from "react-hook-form"
@@ -50,10 +50,14 @@ interface Category {
 export default function BusinessRegisterPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const locale = params.locale as string
   const t = useTranslations("auth.register")
   const tBusiness = useTranslations("auth.register.businessRegistration")
   const tCommon = useTranslations("common")
+  
+  // Get invite parameter from URL
+  const inviteId = searchParams.get("invite")
 
   const steps = [
     { id: 1, title: tBusiness("stepAccount"), icon: "👤" },
@@ -197,6 +201,7 @@ export default function BusinessRegisterPage() {
         tiktok: values.tiktok || "",
         businessLatitude: locationCoordinates?.lat ?? null,
         businessLongitude: locationCoordinates?.lng ?? null,
+        ...(inviteId && { inviterId: inviteId }),
       }
 
       const response = await fetch("/api/register", {

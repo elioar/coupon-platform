@@ -15,7 +15,9 @@ interface Coupon {
   code: string | null
   couponType: "ONLINE_CODE" | "QR_CODE"
   imagePath: string | null
-  discountPercentage: number
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
   expirationDate: string
   category: {
     id: string
@@ -46,6 +48,48 @@ const formatExpirationDate = (dateString: string, locale: string) => {
     day: "2-digit",
     year: "numeric",
   }).format(date)
+}
+
+const formatDiscount = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}%`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "1+1"
+    case "BOGO_2_1":
+      return "2+1"
+    default:
+      return `${coupon.discountPercentage || 0}%`
+  }
+}
+
+const formatDiscountLabel = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}, discountText: string = "OFF") => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}% ${discountText}`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "Buy 1 Get 1"
+    case "BOGO_2_1":
+      return "Buy 2 Get 1"
+    default:
+      return `${coupon.discountPercentage || 0}% ${discountText}`
+  }
 }
 
 export default function CouponModal({ coupon, isMember, locale, onClose }: CouponModalProps) {
@@ -164,7 +208,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
             />
             {/* Discount Badge */}
             <div className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 px-3 py-1.5 text-sm font-bold text-white shadow-lg">
-              {coupon.discountPercentage}% {t("discount")}
+              {formatDiscountLabel(coupon, t("discount"))}
             </div>
           </div>
         ) : (
@@ -172,14 +216,16 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <div className="text-5xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {coupon.discountPercentage}%
+                  {formatDiscount(coupon)}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-green-600 dark:text-green-400">{t("discount")}</div>
+                {(coupon.discountType === "PERCENT" || !coupon.discountType) && (
+                  <div className="mt-1 text-xs font-semibold text-green-600 dark:text-green-400">{t("discount")}</div>
+                )}
               </div>
             </div>
             {/* Discount Badge */}
             <div className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 px-3 py-1.5 text-sm font-bold text-white shadow-lg">
-              {coupon.discountPercentage}% {t("discount")}
+              {formatDiscountLabel(coupon, t("discount"))}
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
@@ -26,6 +26,47 @@ const formatExpirationDate = (dateString: string, locale: string) => {
   }).format(date)
 }
 
+const formatDiscount = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}%`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "1+1"
+    case "BOGO_2_1":
+      return "2+1"
+    default:
+      return `${coupon.discountPercentage || 0}%`
+  }
+}
+
+const formatDiscountLabel = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}% OFF`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "Buy 1 Get 1"
+    case "BOGO_2_1":
+      return "Buy 2 Get 1"
+    default:
+      return `${coupon.discountPercentage || 0}% OFF`
+  }
+}
 
 interface Coupon {
   id: string
@@ -33,7 +74,9 @@ interface Coupon {
   description: string
   code: string | null
   couponType: "ONLINE_CODE" | "QR_CODE"
-  discountPercentage: number
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage: number | null
+  discountAmount: number | null
   expirationDate: string
   status: string
   imagePath: string | null
@@ -66,6 +109,7 @@ export default function BusinessDashboard() {
   const tProfile = useTranslations("profile")
   const tCouponForm = useTranslations("couponForm")
   const tCommon = useTranslations("common")
+  const tRefer = useTranslations("dashboard.business.referBusiness")
   const params = useParams()
   const searchParams = useSearchParams()
   const locale = params.locale as string
@@ -109,12 +153,23 @@ export default function BusinessDashboard() {
   const [resubmittingCouponId, setResubmittingCouponId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [showQRScanner, setShowQRScanner] = useState(false)
+  const [invites, setInvites] = useState<any[]>([])
+  const [inviteStats, setInviteStats] = useState<any>(null)
+  const [loadingInvites, setLoadingInvites] = useState(true)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const lastRefreshedSection = useRef<string | null>(null)
+
+  // Get invite link
+  const inviteLink = session?.user?.id
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/${locale}/register/business?invite=${session.user.id}`
+    : ""
   const [formErrors, setFormErrors] = useState<{
     title?: string
     description?: string
     code?: string
     categoryId?: string
     discountPercentage?: string
+    discountAmount?: string
     expirationDate?: string
     maxUsesPerUser?: string
     validDays?: string
@@ -128,7 +183,9 @@ export default function BusinessDashboard() {
     code: "",
     couponType: "ONLINE_CODE" as "ONLINE_CODE" | "QR_CODE",
     categoryId: "",
-    discountPercentage: 10,
+    discountType: "PERCENT" as "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1",
+    discountPercentage: 10 as number | undefined,
+    discountAmount: undefined as number | undefined,
     expirationDate: "",
     imagePath: "",
     usageLimitType: "SINGLE_USE" as "SINGLE_USE" | "MULTIPLE_USE" | "UNLIMITED",
@@ -276,11 +333,19 @@ export default function BusinessDashboard() {
       errors.categoryId = 'Please select a category'
     }
 
-    if (!formData.discountPercentage || formData.discountPercentage < 1) {
-      errors.discountPercentage = 'Discount must be at least 1%'
-    } else if (formData.discountPercentage > 100) {
-      errors.discountPercentage = 'Discount cannot exceed 100%'
+    // Validate discount based on type
+    if (formData.discountType === "PERCENT") {
+      if (!formData.discountPercentage || formData.discountPercentage < 1) {
+        errors.discountPercentage = 'Discount must be at least 1%'
+      } else if (formData.discountPercentage > 100) {
+        errors.discountPercentage = 'Discount cannot exceed 100%'
+      }
+    } else if (formData.discountType === "FIXED") {
+      if (!formData.discountAmount || formData.discountAmount <= 0) {
+        errors.discountAmount = 'Discount amount must be greater than 0'
+      }
     }
+    // BOGO types don't need validation
 
     if (!formData.expirationDate) {
       errors.expirationDate = 'Expiration date is required'
@@ -364,7 +429,9 @@ export default function BusinessDashboard() {
           code: "",
           couponType: "ONLINE_CODE",
           categoryId: "",
+          discountType: "PERCENT",
           discountPercentage: 10,
+          discountAmount: undefined,
           expirationDate: "",
           imagePath: "",
           usageLimitType: "SINGLE_USE",
@@ -397,7 +464,9 @@ export default function BusinessDashboard() {
       code: coupon.code || "",
       couponType: coupon.couponType || "ONLINE_CODE",
       categoryId: coupon.category.id,
-      discountPercentage: coupon.discountPercentage,
+      discountType: coupon.discountType || "PERCENT",
+      discountPercentage: coupon.discountPercentage || undefined,
+      discountAmount: coupon.discountAmount || undefined,
       expirationDate: coupon.expirationDate.split('T')[0],
       imagePath: coupon.imagePath || "",
       usageLimitType: coupon.usageLimitType || "SINGLE_USE",
@@ -441,7 +510,9 @@ export default function BusinessDashboard() {
           code: "",
           couponType: "ONLINE_CODE",
           categoryId: "",
+          discountType: "PERCENT",
           discountPercentage: 10,
+          discountAmount: undefined,
           expirationDate: "",
           imagePath: "",
           usageLimitType: "SINGLE_USE",
@@ -617,7 +688,9 @@ export default function BusinessDashboard() {
       code: "",
       couponType: "ONLINE_CODE",
       categoryId: "",
+      discountType: "PERCENT",
       discountPercentage: 10,
+      discountAmount: undefined,
       expirationDate: "",
       imagePath: "",
       usageLimitType: "SINGLE_USE",
@@ -707,6 +780,81 @@ export default function BusinessDashboard() {
     }
     fetchAnalytics()
   }, [section, dateRange, session?.user?.id])
+
+  // Fetch invites
+  useEffect(() => {
+    const fetchInvites = async () => {
+      if (!session || section !== "referBusiness") {
+        setLoadingInvites(false)
+        return
+      }
+
+      try {
+        const response = await fetch("/api/invites")
+        if (response.ok) {
+          const data = await response.json()
+          setInvites(data.invites || [])
+          setInviteStats(data.stats || {})
+        }
+      } catch (error) {
+        console.error("Error fetching invites:", error)
+      } finally {
+        setLoadingInvites(false)
+      }
+    }
+
+    fetchInvites()
+  }, [session, section])
+
+  // Refresh session when viewing referBusiness section to get latest membership data
+  useEffect(() => {
+    if (session && section === "referBusiness" && lastRefreshedSection.current !== section) {
+      lastRefreshedSection.current = section
+      update().catch((err) => {
+        // Silently fail - session might already be up to date
+        console.debug("Session update failed (may already be current):", err)
+      })
+    }
+  }, [section, session, update])
+
+  const handleCopyLink = async () => {
+    if (!inviteLink || typeof window === "undefined") return
+
+    try {
+      // Try modern Clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(inviteLink)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 2000)
+        return
+      }
+
+      // Fallback to older method
+      const textArea = document.createElement("textarea")
+      textArea.value = inviteLink
+      textArea.style.position = "fixed"
+      textArea.style.left = "-999999px"
+      textArea.style.top = "-999999px"
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        const successful = document.execCommand("copy")
+        if (successful) {
+          setLinkCopied(true)
+          setTimeout(() => setLinkCopied(false), 2000)
+        } else {
+          throw new Error("Copy command failed")
+        }
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    } catch (err) {
+      console.error("Failed to copy link:", err)
+      // Optionally show an error message to the user
+    }
+  }
 
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1102,7 +1250,7 @@ export default function BusinessDashboard() {
                                 )}
                                 <span className="text-gray-400 dark:text-zinc-600">•</span>
                                 <span className="font-semibold text-violet-600 dark:text-violet-400">
-                                  {coupon.discountPercentage}% OFF
+                                  {formatDiscountLabel(coupon)}
                                 </span>
                                 <span className="text-gray-400 dark:text-zinc-600">•</span>
                                 <span className="text-gray-500 dark:text-zinc-500">
@@ -1390,7 +1538,6 @@ export default function BusinessDashboard() {
               <div className="flex items-center justify-end gap-3 rounded-2xl border border-gray-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <button 
                   type="button"
-                  onClick={() => window.location.reload()}
                   className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                 >
                   Cancel
@@ -1691,6 +1838,198 @@ export default function BusinessDashboard() {
             )}
               </div>
         )
+
+      case "referBusiness": {
+        const getStatusLabel = (status: string) => {
+          switch (status) {
+            case "PENDING":
+              return tRefer("statusPending")
+            case "REGISTERED":
+              return tRefer("statusRegistered")
+            case "ACTIVE":
+              return tRefer("statusActive")
+            default:
+              return status
+          }
+        }
+
+        const getStatusColor = (status: string) => {
+          switch (status) {
+            case "PENDING":
+              return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+            case "REGISTERED":
+              return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+            case "ACTIVE":
+              return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+            default:
+              return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+          }
+        }
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl md:text-4xl">
+                {tRefer("title")}
+              </h1>
+              <p className="mt-2 text-sm text-gray-500 dark:text-zinc-400 sm:text-base">
+                {tRefer("subtitle")}
+              </p>
+            </div>
+
+            {/* Invite Link Card */}
+            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+              <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                {tRefer("inviteLink")}
+              </h2>
+              <p className="mb-4 text-sm text-gray-600 dark:text-zinc-400">
+                {tRefer("description")}
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 break-all">
+                  {inviteLink || tCommon("loading")}
+                </div>
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                >
+                  {linkCopied ? (
+                    <>
+                      <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                      {tRefer("linkCopied")}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      {tRefer("copyLink")}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            {inviteStats && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                    {tRefer("stats.total")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                    {inviteStats.total || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                    {tRefer("stats.pending")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {inviteStats.pending || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                    {tRefer("stats.registered")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {inviteStats.registered || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <p className="text-sm font-medium text-gray-600 dark:text-zinc-400">
+                    {tRefer("stats.active")}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+                    {inviteStats.active || 0}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Rewards Card */}
+            {inviteStats && inviteStats.rewardsGranted > 0 && (
+              <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-white p-6 shadow-sm dark:border-green-800 dark:from-green-950/20 dark:to-zinc-900">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
+                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {tRefer("freeMonthsEarned")}
+                    </h3>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {inviteStats.rewardsGranted} {inviteStats.rewardsGranted === 1 ? "month" : "months"}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
+                      {tRefer("freeMonthsDescription")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Invited Businesses List */}
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="border-b border-gray-200 px-6 py-4 dark:border-zinc-800">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {tRefer("invitedBusinesses")}
+                </h2>
+              </div>
+              {loadingInvites ? (
+                <div className="p-8 text-center text-gray-600 dark:text-zinc-400">
+                  {tCommon("loading")}
+                </div>
+              ) : invites.length === 0 ? (
+                <div className="p-12 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
+                    <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {tRefer("noInvites")}
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">
+                    {tRefer("noInvitesDescription")}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200 dark:divide-zinc-800">
+                  {invites.map((invite) => (
+                    <div key={invite.id} className="p-6 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {invite.invitedBusiness?.name || "Unknown Business"}
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
+                            {tRefer("invitedOn")}: {new Date(invite.createdAt).toLocaleDateString(locale, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(invite.status)}`}>
+                            {getStatusLabel(invite.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
 
       case "settings":
         return (
@@ -2111,7 +2450,7 @@ export default function BusinessDashboard() {
                                 <span className="text-gray-600 dark:text-zinc-400">QR Code</span>
                               )}
                               <span className="font-semibold text-violet-600 dark:text-violet-400">
-                                {coupon.discountPercentage}% OFF
+                                {formatDiscountLabel(coupon)}
                               </span>
                               <span className="text-gray-600 dark:text-zinc-400">
                                 Expires: {formatExpirationDate(coupon.expirationDate, locale)}
@@ -2542,44 +2881,154 @@ export default function BusinessDashboard() {
                             )}
               </div>
 
+                {/* Discount Type */}
                 <div>
-                      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                              {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                    <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    {tCouponForm("discountType")} <span className="text-red-500">*</span>
                   </label>
-                        <div className="relative">
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max="100"
-                    value={formData.discountPercentage}
-                                onChange={(e) => {
-                                  setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || 0 })
-                                  if (formErrors.discountPercentage) {
-                                    setFormErrors({ ...formErrors, discountPercentage: undefined })
-                                  }
-                                }}
-                                placeholder="20"
-                          className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
-                                  formErrors.discountPercentage 
-                                    ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
-                              : 'bg-gray-50 dark:bg-zinc-800/50'
-                                }`}
-                              />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
-                        </div>
-                            {formErrors.discountPercentage && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
-                                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                                {formErrors.discountPercentage}
-                              </p>
-                            )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, discountType: "PERCENT", discountAmount: undefined })}
+                      className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
+                        formData.discountType === "PERCENT"
+                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, discountType: "FIXED", discountPercentage: undefined })}
+                      className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
+                        formData.discountType === "FIXED"
+                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      -€
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, discountType: "BOGO_1_1", discountPercentage: undefined, discountAmount: undefined })}
+                      className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
+                        formData.discountType === "BOGO_1_1"
+                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      1+1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, discountType: "BOGO_2_1", discountPercentage: undefined, discountAmount: undefined })}
+                      className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
+                        formData.discountType === "BOGO_2_1"
+                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      2+1
+                    </button>
+                  </div>
                 </div>
+
+                {/* Discount Value - Conditional based on type */}
+                {formData.discountType === "PERCENT" && (
+                  <div>
+                    <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required={formData.discountType === "PERCENT"}
+                        min="1"
+                        max="100"
+                        value={formData.discountPercentage || ""}
+                        onChange={(e) => {
+                          setFormData({ ...formData, discountPercentage: parseInt(e.target.value) || undefined })
+                          if (formErrors.discountPercentage) {
+                            setFormErrors({ ...formErrors, discountPercentage: undefined })
+                          }
+                        }}
+                        placeholder="20"
+                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                          formErrors.discountPercentage 
+                            ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
+                    </div>
+                    {formErrors.discountPercentage && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                        <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {formErrors.discountPercentage}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {formData.discountType === "FIXED" && (
+                  <div>
+                    <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {tCouponForm("discountAmount")} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        required={formData.discountType === "FIXED"}
+                        min="0.01"
+                        step="0.01"
+                        value={formData.discountAmount || ""}
+                        onChange={(e) => {
+                          setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || undefined })
+                          if (formErrors.discountAmount) {
+                            setFormErrors({ ...formErrors, discountAmount: undefined })
+                          }
+                        }}
+                        placeholder="5.00"
+                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                          formErrors.discountAmount 
+                            ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
+                            : 'bg-gray-50 dark:bg-zinc-800/50'
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">€</span>
+                    </div>
+                    {formErrors.discountAmount && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                        <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {formErrors.discountAmount}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {(formData.discountType === "BOGO_1_1" || formData.discountType === "BOGO_2_1") && (
+                  <div className="rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-4">
+                    <p className="text-sm text-violet-700 dark:text-violet-300">
+                      {formData.discountType === "BOGO_1_1" 
+                        ? "Buy 1, Get 1 Free - Customer gets one item free when buying one item"
+                        : "Buy 2, Get 1 Free - Customer gets one item free when buying two items"}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">

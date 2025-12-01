@@ -121,11 +121,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       if (trigger === "update" && token.id) {
-        // When session is explicitly updated, prefer provided values to avoid extra query
+        // When session is explicitly updated, always refresh from database
+        // This ensures membershipExpiry and other fields are up-to-date
+        // Add a small delay to ensure database write has completed
+        await new Promise(resolve => setTimeout(resolve, 100))
+        await hydrateTokenFromDb(token.id as string)
+        
+        // If session provided name, use it (but still refresh from DB for other fields)
         if (session?.name) {
           token.name = session.name
         }
+      }
+      
+      // Also refresh from DB periodically (every 5 minutes) to catch external updates
+      // This helps when membership is updated via invite rewards
+      if (token.id && !token.lastRefreshed) {
+        token.lastRefreshed = Date.now()
+      }
+      
+      if (token.id && token.lastRefreshed && (Date.now() - (token.lastRefreshed as number)) > 300000) {
+        // Refresh every 5 minutes to catch any external updates
         await hydrateTokenFromDb(token.id as string)
+        token.lastRefreshed = Date.now()
       }
 
       return token

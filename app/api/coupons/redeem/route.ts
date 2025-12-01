@@ -205,13 +205,29 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Format discount message based on type
+    let discountMessage = ""
+    if (redemption.coupon.discountType === "PERCENT") {
+      discountMessage = `Έκπτωση ${redemption.coupon.discountPercentage || 0}% ενεργή 🎉`
+    } else if (redemption.coupon.discountType === "FIXED") {
+      discountMessage = `Έκπτωση -€${(redemption.coupon.discountAmount || 0).toFixed(2)} ενεργή 🎉`
+    } else if (redemption.coupon.discountType === "BOGO_1_1") {
+      discountMessage = "Buy 1 Get 1 ενεργό 🎉"
+    } else if (redemption.coupon.discountType === "BOGO_2_1") {
+      discountMessage = "Buy 2 Get 1 ενεργό 🎉"
+    } else {
+      discountMessage = `Έκπτωση ${redemption.coupon.discountPercentage || 0}% ενεργή 🎉`
+    }
+
     return NextResponse.json({
       valid: true,
-      message: `Έκπτωση ${redemption.coupon.discountPercentage}% ενεργή 🎉`,
+      message: discountMessage,
       coupon: {
         id: redemption.coupon.id,
         title: redemption.coupon.title,
-        discountPercentage: redemption.coupon.discountPercentage
+        discountType: redemption.coupon.discountType,
+        discountPercentage: redemption.coupon.discountPercentage,
+        discountAmount: redemption.coupon.discountAmount
       },
       user: {
         name: redemption.user.name,

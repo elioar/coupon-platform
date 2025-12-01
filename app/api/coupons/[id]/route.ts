@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
-import { CouponType, UsageLimitType } from "@prisma/client"
+import { CouponType, UsageLimitType, DiscountType } from "@prisma/client"
 
 const updateCouponSchema = z.object({
   title: z.string().min(3).max(200).optional(),
@@ -13,7 +13,9 @@ const updateCouponSchema = z.object({
   ),
   couponType: z.nativeEnum(CouponType).optional(),
   categoryId: z.string().optional(),
+  discountType: z.nativeEnum(DiscountType).optional(),
   discountPercentage: z.number().min(1).max(100).optional(),
+  discountAmount: z.number().min(0.01).optional(),
   expirationDate: z.string().datetime().optional(),
   imagePath: z.string().optional(),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
@@ -175,6 +177,21 @@ export async function PATCH(
         updateData.validDays = []
         updateData.validStartHour = undefined
         updateData.validEndHour = undefined
+      }
+    }
+    // Handle discount type fields
+    if (validatedData.discountType !== undefined) {
+      updateData.discountType = validatedData.discountType
+      if (validatedData.discountType === DiscountType.PERCENT) {
+        updateData.discountPercentage = validatedData.discountPercentage
+        updateData.discountAmount = null
+      } else if (validatedData.discountType === DiscountType.FIXED) {
+        updateData.discountAmount = validatedData.discountAmount
+        updateData.discountPercentage = null
+      } else {
+        // BOGO types
+        updateData.discountPercentage = null
+        updateData.discountAmount = null
       }
     }
 

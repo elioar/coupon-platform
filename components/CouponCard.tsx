@@ -13,7 +13,9 @@ interface Coupon {
   code: string | null
   couponType: "ONLINE_CODE" | "QR_CODE"
   imagePath: string | null
-  discountPercentage: number
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
   expirationDate: string
   category: {
     id: string
@@ -48,6 +50,48 @@ const formatExpirationDate = (dateString: string, locale: string) => {
     day: "2-digit",
     year: "numeric",
   }).format(date)
+}
+
+const formatDiscount = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}%`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "1+1"
+    case "BOGO_2_1":
+      return "2+1"
+    default:
+      return `${coupon.discountPercentage || 0}%`
+  }
+}
+
+const formatDiscountLabel = (coupon: {
+  discountType?: "PERCENT" | "FIXED" | "BOGO_1_1" | "BOGO_2_1"
+  discountPercentage?: number | null
+  discountAmount?: number | null
+}, discountLabel?: string) => {
+  const discountType = coupon.discountType || "PERCENT"
+  
+  switch (discountType) {
+    case "PERCENT":
+      return `${coupon.discountPercentage || 0}% ${discountLabel || "OFF"}`
+    case "FIXED":
+      return `-€${(coupon.discountAmount || 0).toFixed(2)}`
+    case "BOGO_1_1":
+      return "Buy 1 Get 1"
+    case "BOGO_2_1":
+      return "Buy 2 Get 1"
+    default:
+      return `${coupon.discountPercentage || 0}% ${discountLabel || "OFF"}`
+  }
 }
 
 export default function CouponCard({ coupon, isMember, locale, onDetailsClick }: CouponCardProps) {
@@ -208,13 +252,10 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
               className={`object-cover transition-transform duration-500 ${isHovered ? 'scale-110' : 'scale-100'}`}
             />
           ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-teal-500/10">
-              <div className="text-center">
-                <span className="text-6xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {coupon.discountPercentage}%
-                </span>
-                <div className="mt-2 text-xs font-semibold text-green-600 dark:text-green-400">OFF</div>
-              </div>
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-teal-500/5 dark:from-green-900/10 dark:via-emerald-900/10 dark:to-teal-900/10">
+              <svg className="h-16 w-16 text-green-600/10 dark:text-green-400/5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
             </div>
           )}
           
@@ -223,7 +264,7 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
           
           {/* Discount Badge */}
           <div className="absolute right-3 top-3 z-10 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-xl backdrop-blur-sm animate-pulse-subtle">
-            <span className="drop-shadow-md">{coupon.discountPercentage}% {t("discount")}</span>
+            <span className="drop-shadow-md">{formatDiscountLabel(coupon, t("discount"))}</span>
           </div>
           
           {/* Category Badge */}

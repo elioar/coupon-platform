@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth-helpers"
 import { CouponStatus } from "@prisma/client"
 import { z } from "zod"
+import { checkAndActivateInvites } from "@/lib/invite-helpers"
 
 const approvalSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
@@ -44,6 +45,16 @@ export async function POST(
         category: true,
       },
     })
+
+    // If coupon was approved, check if this makes the business "active" for invite rewards
+    if (status === "APPROVED") {
+      try {
+        await checkAndActivateInvites(updatedCoupon.businessId)
+      } catch (error) {
+        // Log error but don't fail the coupon approval
+        console.error("Error checking invites:", error)
+      }
+    }
 
     return NextResponse.json({
       message: `Coupon ${status.toLowerCase()} successfully`,
