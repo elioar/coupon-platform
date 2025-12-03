@@ -103,7 +103,7 @@ export default function DashboardHeader({
             </button>
           )}
           <Link href={`/${locale}`} className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600">
               <svg
                 className="h-5 w-5 text-white"
                 fill="none"
@@ -116,7 +116,7 @@ export default function DashboardHeader({
                 <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
             </div>
-            <span className="text-base font-bold text-gray-900 dark:text-white sm:text-lg">CouponHub</span>
+            <span className="text-base font-bold text-gray-900 dark:text-white sm:text-lg">VibePeek</span>
           </Link>
         </div>
 
@@ -152,8 +152,8 @@ export default function DashboardHeader({
             </svg>
             {/* Notification Badge */}
             <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500"></span>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
             </span>
           </button>
 
@@ -165,7 +165,7 @@ export default function DashboardHeader({
               aria-expanded={isUserMenuOpen}
               aria-haspopup="true"
             >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-xs font-bold text-white sm:h-7 sm:w-7">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-xs font-bold text-white sm:h-7 sm:w-7">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <span className="hidden text-sm font-medium text-gray-900 dark:text-white lg:block">
@@ -261,9 +261,9 @@ export default function DashboardHeader({
             style={{ animation: 'scaleIn 0.2s ease-out' }}
           >
             {/* Header */}
-            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
+            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-green-50 via-green-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-green-950/30 dark:via-green-950/20 dark:to-zinc-900">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-emerald-700">
                   <svg className="h-6 w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>

@@ -137,7 +137,6 @@ export default function GooglePlacesAutocomplete({
     // Get API key
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!apiKey) {
-      console.error("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set. Please add it to your .env file.")
       setIsLoading(false)
       return
     }
@@ -150,13 +149,11 @@ export default function GooglePlacesAutocomplete({
         setApiError(null)
       })
       .catch((error) => {
-        console.error("Error loading Google Maps:", error)
         setIsLoading(false)
         setIsLoaded(false)
         // Set error message but don't block the input
         if (error.message.includes("ApiNotActivatedMapError") || error.message.includes("not enabled")) {
           setApiError("Maps JavaScript API not enabled. You can still type manually.")
-          console.warn("⚠️ Maps JavaScript API is not enabled. Autocomplete will not work, but you can still type the location manually.")
         } else {
           setApiError("Google Maps failed to load. You can still type manually.")
         }
@@ -178,7 +175,6 @@ export default function GooglePlacesAutocomplete({
     try {
       // Check if Places API is available
       if (!window.google?.maps?.places) {
-        console.warn("Places API is not available. Input will work as regular text field.")
         setApiError("Places API not available. You can still type manually.")
         return
       }
@@ -237,23 +233,12 @@ export default function GooglePlacesAutocomplete({
               onCoordinatesChange(lat, lng)
             }
           }
-          
-          // Log place details for debugging (can be removed in production)
-          if (process.env.NODE_ENV === "development") {
-            console.log("Selected place:", {
-              address: place.formatted_address,
-              name: place.name,
-              placeId: place.place_id,
-              location: place.geometry?.location,
-            })
-          }
         }
       })
 
       // Clear any previous errors on success
       setApiError(null)
     } catch (error: any) {
-      console.error("Error initializing Google Places Autocomplete:", error)
       setApiError("Autocomplete unavailable. You can still type manually.")
       // Don't block the input - let user type manually
     }

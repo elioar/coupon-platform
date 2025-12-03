@@ -41,11 +41,9 @@ export default function MembershipPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        console.error("No checkout URL returned")
         setLoading(false)
       }
     } catch (error) {
-      console.error("Error creating checkout session:", error)
       setLoading(false)
     }
   }

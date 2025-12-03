@@ -162,7 +162,7 @@ export default function Navigation() {
             {session && session.user.role !== "ADMIN" && (
               <Link
                 href={getDashboardUrl()}
-                className="group flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                className="group flex items-center gap-2 rounded-xl border-2 border-green-500 bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-green-500/20 transition-all hover:from-green-600 hover:to-emerald-600 hover:shadow-lg hover:shadow-green-500/30"
               >
                 <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                   <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -269,16 +269,16 @@ export default function Navigation() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 hover:shadow dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+                  className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 hover:shadow dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20"
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-sm font-bold text-white shadow-sm">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-xs font-bold text-white shadow-sm">
                     {session.user.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     {session.user.name}
                   </span>
                   <svg
-                    className={`h-4 w-4 text-zinc-400 transition-transform ${
+                    className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${
                       profileDropdownOpen ? "rotate-180" : ""
                     }`}
                     fill="none"
@@ -655,9 +655,9 @@ export default function Navigation() {
             style={{ animation: 'scaleIn 0.2s ease-out' }}
           >
             {/* Header */}
-            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
+            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-green-50 via-green-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-green-950/30 dark:via-green-950/20 dark:to-zinc-900">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-emerald-700">
                   <svg className="h-6 w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>

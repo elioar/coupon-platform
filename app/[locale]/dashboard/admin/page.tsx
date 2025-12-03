@@ -200,7 +200,7 @@ export default function AdminDashboard() {
         setStats(statsData.stats || null)
         setCategories(categoriesData.categories || [])
       } catch (error) {
-        console.error("Error fetching data:", error)
+        // Error fetching data - handled silently
       } finally {
         setLoading(false)
       }
@@ -238,9 +238,8 @@ export default function AdminDashboard() {
       ]
       
       setAllCoupons(allCouponsData)
-    } catch (error) {
-      console.error("Error fetching all coupons:", error)
-      setMessage({ type: 'error', text: 'Failed to load coupons' })
+      } catch (error) {
+        setMessage({ type: 'error', text: 'Failed to load coupons' })
     } finally {
       setLoadingCoupons(false)
     }
@@ -257,7 +256,6 @@ export default function AdminDashboard() {
       const data = await response.json()
       setSelectedUserProfile(data.user)
     } catch (error) {
-      console.error("Error fetching user profile:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to load user profile"
       setMessage({ type: "error", text: errorMessage })
       // Close modal on error
@@ -303,7 +301,6 @@ export default function AdminDashboard() {
         })
       }
     } catch (error) {
-      console.error("Error approving coupon:", error)
       setMessage({ 
         type: 'error', 
         text: 'An error occurred. Please try again.' 
@@ -347,7 +344,6 @@ export default function AdminDashboard() {
         })
       }
     } catch (error) {
-      console.error("Error creating category:", error)
       setMessage({ 
         type: 'error', 
         text: 'An error occurred. Please try again.' 
@@ -405,7 +401,6 @@ export default function AdminDashboard() {
         })
       }
     } catch (error) {
-      console.error("Error updating category:", error)
       setMessage({ 
         type: 'error', 
         text: 'An error occurred. Please try again.' 
@@ -442,7 +437,6 @@ export default function AdminDashboard() {
         })
       }
     } catch (error) {
-      console.error("Error deleting category:", error)
       setMessage({ 
         type: 'error', 
         text: 'An error occurred. Please try again.' 
@@ -519,7 +513,6 @@ export default function AdminDashboard() {
         setMessage({ type: 'error', text: data.error || 'Failed to update coupon' })
       }
     } catch (error) {
-      console.error("Error updating coupon:", error)
       setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setSubmittingCoupon(false)
@@ -549,7 +542,6 @@ export default function AdminDashboard() {
         setMessage({ type: 'error', text: data.error || 'Failed to delete coupon' })
       }
     } catch (error) {
-      console.error("Error deleting coupon:", error)
       setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setDeletingCouponId(null)
@@ -586,7 +578,6 @@ export default function AdminDashboard() {
         setCouponAnalytics({ views: 0, clicks: 0, redemptions: 0, saves: 0 })
       }
     } catch (error) {
-      console.error("Error fetching coupon:", error)
       setMessage({ type: 'error', text: 'Error loading coupon details' })
       setViewingCouponId(null)
     } finally {

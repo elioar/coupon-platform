@@ -150,7 +150,7 @@ export default function UserDashboard() {
         const data = await response.json()
         setCoupons(data.coupons || [])
       } catch (error) {
-        console.error("Error fetching coupons:", error)
+        // Error handled silently
       } finally {
         setLoading(false)
       }
@@ -174,7 +174,7 @@ export default function UserDashboard() {
           setRedemptions(data.redemptions || [])
         }
       } catch (error) {
-        console.error("Error fetching redemptions:", error)
+        // Error handled silently
       } finally {
         setLoadingRedemptions(false)
       }
@@ -228,7 +228,6 @@ export default function UserDashboard() {
           about: profile.about ?? "",
         })
       } catch (error) {
-        console.error(error)
         setMessage({ type: "error", text: tProfile("error") })
       }
     }
@@ -308,7 +307,7 @@ export default function UserDashboard() {
           }
         }
       } catch (error) {
-        console.error("Error fetching invites:", error)
+        // Error handled silently
       } finally {
         setLoadingInvites(false)
       }
@@ -331,7 +330,7 @@ export default function UserDashboard() {
           setInviteStats(data.stats || {})
         }
       } catch (error) {
-        console.error("Error fetching invite stats:", error)
+        // Error handled silently
       }
     }
 
@@ -371,10 +370,9 @@ export default function UserDashboard() {
       } finally {
         document.body.removeChild(textArea)
       }
-    } catch (err) {
-      console.error("Failed to copy link:", err)
-      // Optionally show an error message to the user
-    }
+      } catch (err) {
+        // Failed to copy - silently fail
+      }
   }
 
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -413,7 +411,6 @@ export default function UserDashboard() {
       setMessage({ type: "success", text: tProfile("success") })
       await update({ name: profile.name ?? "" })
     } catch (error) {
-      console.error(error)
       setMessage({ type: "error", text: tProfile("error") })
     } finally {
       setSaving(false)

@@ -89,16 +89,16 @@ async function main() {
   console.log('👤 Creating admin user...')
   const adminPassword = await bcrypt.hash('admin123', 10)
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@couponme.com' },
+    where: { email: 'admin@vibepeek.com' },
     update: {},
     create: {
-      email: 'admin@couponme.com',
+      email: 'admin@vibepeek.com',
       password: adminPassword,
       name: 'Admin User',
       role: 'ADMIN',
     },
   })
-  console.log('✅ Admin user created (email: admin@couponme.com, password: admin123)')
+  console.log('✅ Admin user created (email: admin@vibepeek.com, password: admin123)')
 
   // Create business users
   console.log('🏢 Creating business users...')
@@ -634,7 +634,7 @@ async function main() {
   console.log('\n🎉 Database seeded successfully!')
   console.log('\n📋 Summary:')
   console.log(`   - ${categories.length} categories`)
-  console.log(`   - 1 admin user (admin@couponme.com / admin123)`)
+  console.log(`   - 1 admin user (admin@vibepeek.com / admin123)`)
   console.log(`   - ${businesses.length} business users (*/business123)`)
   console.log(`   - ${coupons.length} coupons (various statuses)`)
   console.log('\n💡 You can now log in and explore the platform!')

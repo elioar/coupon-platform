@@ -115,10 +115,6 @@ export default function BusinessDashboard() {
   const locale = params.locale as string
   const section = searchParams.get("section") || "overview"
   
-  // Debug: Log section to verify it's being read correctly
-  useEffect(() => {
-    console.log("Current section:", section)
-  }, [section])
 
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -235,18 +231,12 @@ export default function BusinessDashboard() {
 
         // Check if responses are OK before parsing JSON
         if (!couponsRes.ok) {
-          const text = await couponsRes.text()
-          console.error("Failed to fetch coupons:", couponsRes.status, text.substring(0, 200))
           throw new Error(`Failed to fetch coupons: ${couponsRes.status}`)
         }
         if (!categoriesRes.ok) {
-          const text = await categoriesRes.text()
-          console.error("Failed to fetch categories:", categoriesRes.status, text.substring(0, 200))
           throw new Error(`Failed to fetch categories: ${categoriesRes.status}`)
         }
         if (!analyticsRes.ok) {
-          const text = await analyticsRes.text()
-          console.error("Failed to fetch analytics:", analyticsRes.status, text.substring(0, 200))
           // Analytics is optional, so we'll continue even if it fails
         }
 
@@ -268,7 +258,7 @@ export default function BusinessDashboard() {
           })
         }
       } catch (error) {
-        console.error("Error fetching data:", error)
+        // Error handled by state
       } finally {
         setLoading(false)
       }
@@ -298,9 +288,9 @@ export default function BusinessDashboard() {
         const data = await response.json()
         setFormData(prev => ({ ...prev, imagePath: data.url }))
       }
-    } catch (error) {
-      console.error("Error uploading image:", error)
-    } finally {
+      } catch (error) {
+        // Error handled by state
+      } finally {
       setUploadingImage(false)
     }
   }
@@ -443,12 +433,10 @@ export default function BusinessDashboard() {
         })
         setMessage({ type: 'success', text: 'Coupon created successfully! Waiting for admin approval.' })
       } else {
-        console.error("Coupon creation error:", data)
         const errorMessage = data.error || data.details?.[0]?.message || 'Failed to create coupon'
         setMessage({ type: 'error', text: errorMessage })
       }
     } catch (error) {
-      console.error("Error creating coupon:", error)
       setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setSubmitting(false)
@@ -526,9 +514,8 @@ export default function BusinessDashboard() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to update coupon' })
       }
-    } catch (error) {
-      console.error("Error updating coupon:", error)
-      setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
+      } catch (error) {
+        setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setSubmitting(false)
       setTimeout(() => setMessage(null), 5000)
@@ -552,9 +539,8 @@ export default function BusinessDashboard() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to delete coupon' })
       }
-    } catch (error) {
-      console.error("Error deleting coupon:", error)
-      setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
+      } catch (error) {
+        setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setDeletingCouponId(null)
       setTimeout(() => setMessage(null), 5000)
@@ -583,9 +569,8 @@ export default function BusinessDashboard() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to resubmit coupon' })
       }
-    } catch (error) {
-      console.error("Error resubmitting coupon:", error)
-      setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
+      } catch (error) {
+        setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
       setResubmittingCouponId(null)
       setTimeout(() => setMessage(null), 5000)
@@ -605,7 +590,6 @@ export default function BusinessDashboard() {
         result = await response.json()
       } catch (jsonError) {
         // If response is not JSON, create error object
-        console.error("Failed to parse JSON response:", jsonError)
         const errorMessage = response.statusText || "Unknown error"
         setMessage({ 
           type: "error", 
@@ -644,8 +628,6 @@ export default function BusinessDashboard() {
           result.redeemedAt !== undefined ||
           (result.error && result.error.toLowerCase().includes("already"))
         
-        console.log("Redemption error:", { errorMsg, isAlreadyRedeemed, result, status: response.status })
-        
         const messageText = isAlreadyRedeemed 
           ? `⚠ Already Redeemed\n\nThis coupon was used before.` 
           : `✗ ${errorMsg}`
@@ -664,7 +646,6 @@ export default function BusinessDashboard() {
         }
       }
     } catch (error) {
-      console.error("QR Scan Error:", error)
       const errorMessage = t("qrScanError") || "Error validating QR code"
       setMessage({ 
         type: "error", 
@@ -746,7 +727,6 @@ export default function BusinessDashboard() {
           businessTikTok: profile.businessTikTok ?? "",
         })
       } catch (error) {
-        console.error(error)
         setMessage({ type: "error", text: tProfile("error") })
       }
     }
@@ -768,11 +748,9 @@ export default function BusinessDashboard() {
           const data = await response.json()
           setAnalytics(data)
         } else {
-          console.error("Failed to fetch analytics")
           setAnalytics(null)
         }
       } catch (error) {
-        console.error("Error fetching analytics:", error)
         setAnalytics(null)
       } finally {
         setAnalyticsLoading(false)
@@ -797,7 +775,7 @@ export default function BusinessDashboard() {
           setInviteStats(data.stats || {})
         }
       } catch (error) {
-        console.error("Error fetching invites:", error)
+        // Error handled silently
       } finally {
         setLoadingInvites(false)
       }
@@ -810,9 +788,8 @@ export default function BusinessDashboard() {
   useEffect(() => {
     if (session && section === "referBusiness" && lastRefreshedSection.current !== section) {
       lastRefreshedSection.current = section
-      update().catch((err) => {
+      update().catch(() => {
         // Silently fail - session might already be up to date
-        console.debug("Session update failed (may already be current):", err)
       })
     }
   }, [section, session, update])
@@ -850,10 +827,9 @@ export default function BusinessDashboard() {
       } finally {
         document.body.removeChild(textArea)
       }
-    } catch (err) {
-      console.error("Failed to copy link:", err)
-      // Optionally show an error message to the user
-    }
+      } catch (err) {
+        // Failed to copy - silently fail
+      }
   }
 
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -894,7 +870,6 @@ export default function BusinessDashboard() {
       setMessage({ type: "success", text: tProfile("success") })
       await update({ name: profileData.name ?? "" })
     } catch (error) {
-      console.error(error)
       setMessage({ type: "error", text: tProfile("error") })
     } finally {
       setSaving(false)
@@ -1084,7 +1059,7 @@ export default function BusinessDashboard() {
                     setShowTypeSelection(true)
                     setEditingCouponId(null)
                   }}
-                  className="group inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                  className="group inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-green-500 dark:to-green-600 dark:shadow-green-500/20 dark:hover:from-green-600 dark:hover:to-green-700"
                 >
                   <svg className="h-4 w-4 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                   <path d="M12 4v16m8-8H4" />
@@ -1100,11 +1075,11 @@ export default function BusinessDashboard() {
               <>
                 {/* Stats Cards */}
               <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-white p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
-                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
+                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
+                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
                     <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">{t("stats.totalCoupons")}</p>
-                      <p className="mt-3 text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">{stats.total}</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("stats.totalCoupons")}</p>
+                      <p className="mt-3 text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">{stats.total}</p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">{t("stats.allTime")}</p>
                 </div>
                 </div>
@@ -1135,9 +1110,9 @@ export default function BusinessDashboard() {
                         setShowTypeSelection(true)
                         setEditingCouponId(null)
                       }}
-                      className="group w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-violet-50 to-violet-100/50 p-4 text-left transition-all hover:from-violet-100 hover:to-violet-200/50 hover:shadow-md hover:shadow-violet-500/10 active:scale-[0.98] dark:from-violet-900/30 dark:to-violet-900/20 dark:hover:from-violet-900/40 dark:hover:to-violet-900/30"
+                      className="group w-full flex items-center gap-3 rounded-xl bg-gradient-to-r from-green-50 to-green-100/50 p-4 text-left transition-all hover:from-green-100 hover:to-green-200/50 hover:shadow-md hover:shadow-green-500/10 active:scale-[0.98] dark:from-green-900/30 dark:to-green-900/20 dark:hover:from-green-900/40 dark:hover:to-green-900/30"
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 shadow-md group-hover:scale-110 transition-transform">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600 shadow-md group-hover:scale-110 transition-transform">
                         <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                               <path d="M12 4v16m8-8H4" />
                             </svg>
@@ -1188,7 +1163,7 @@ export default function BusinessDashboard() {
                       </div>
                       <Link
                         href={`/${locale}/dashboard/business?section=coupons`}
-                        className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                        className="text-xs font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
                       >
                         View all →
                       </Link>
@@ -1201,7 +1176,7 @@ export default function BusinessDashboard() {
                           <Link
                             key={coupon.id}
                             href={`/${locale}/dashboard/business?section=coupons`}
-                            className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-all hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-800/30 dark:hover:border-violet-700 dark:hover:bg-violet-900/20"
+                            className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-all hover:border-green-300 hover:bg-green-50/50 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-800/30 dark:hover:border-green-700 dark:hover:bg-green-900/20"
                           >
                             {/* Image */}
                             {coupon.imagePath ? (
@@ -1213,8 +1188,8 @@ export default function BusinessDashboard() {
                                 />
                               </div>
                             ) : (
-                              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
-                                <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30">
+                                <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                                   <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                 </svg>
                               </div>
@@ -1223,7 +1198,7 @@ export default function BusinessDashboard() {
                             {/* Content */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                                <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
                                   {coupon.title}
                                 </h3>
                                 <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -1249,7 +1224,7 @@ export default function BusinessDashboard() {
                                   </span>
                                 )}
                                 <span className="text-gray-400 dark:text-zinc-600">•</span>
-                                <span className="font-semibold text-violet-600 dark:text-violet-400">
+                                <span className="font-semibold text-green-600 dark:text-green-400">
                                   {formatDiscountLabel(coupon)}
                                 </span>
                                 <span className="text-gray-400 dark:text-zinc-600">•</span>
@@ -1261,7 +1236,7 @@ export default function BusinessDashboard() {
 
                             {/* Arrow */}
                             <div className="flex-shrink-0">
-                              <svg className="h-5 w-5 text-gray-400 transition group-hover:text-violet-600 dark:text-zinc-500 dark:group-hover:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg className="h-5 w-5 text-gray-400 transition group-hover:text-green-600 dark:text-zinc-500 dark:group-hover:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                                 <path d="M9 5l7 7-7 7" />
                               </svg>
                             </div>
@@ -1316,9 +1291,9 @@ export default function BusinessDashboard() {
             <form onSubmit={handleProfileSubmit} className="space-y-6">
                 {/* Basic Information */}
               <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="border-b border-gray-200 bg-gradient-to-r from-violet-50 to-white px-6 py-4 dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+                <div className="border-b border-gray-200 bg-gradient-to-r from-green-50 to-white px-6 py-4 dark:border-zinc-800 dark:from-green-950/20 dark:to-zinc-900">
                     <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-green-700">
                       <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                           <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
@@ -1340,7 +1315,7 @@ export default function BusinessDashboard() {
                         value={profileData.name}
                         onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                       placeholder="Enter your business name"
-                      className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                      className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                       />
                     </div>
                       <div>
@@ -1350,7 +1325,7 @@ export default function BusinessDashboard() {
                         value={profileData.businessDescription}
                         onChange={(e) => setProfileData({ ...profileData, businessDescription: e.target.value })}
                       placeholder="Describe your business, services, and what makes you unique..."
-                      className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none" 
+                      className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none" 
                       />
                     </div>
                   <div className="grid gap-5 sm:grid-cols-2">
@@ -1359,7 +1334,7 @@ export default function BusinessDashboard() {
                         <select
                           value={profileData.businessCategories}
                           onChange={(e) => setProfileData({ ...profileData, businessCategories: e.target.value })}
-                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 pr-10 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none"
+                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 pr-10 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none"
                         style={{
                           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
                           backgroundSize: '1.5rem',
@@ -1383,7 +1358,7 @@ export default function BusinessDashboard() {
                         }}
                         placeholder="e.g., Athens, Greece"
                         locale={locale}
-                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
+                        className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
                       />
                     </div>
                   </div>
@@ -1420,7 +1395,7 @@ export default function BusinessDashboard() {
                           value={profileData.phone} 
                           onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                           placeholder="+30 123 456 7890"
-                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                         />
                       </div>
                     </div>
@@ -1437,7 +1412,7 @@ export default function BusinessDashboard() {
                           value={profileData.businessVatNumber} 
                           onChange={(e) => setProfileData({ ...profileData, businessVatNumber: e.target.value })}
                           placeholder="EL123456789"
-                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                           />
                         </div>
                       </div>
@@ -1474,7 +1449,7 @@ export default function BusinessDashboard() {
                           value={profileData.businessWebsite}
                           onChange={(e) => setProfileData({ ...profileData, businessWebsite: e.target.value })}
                         placeholder="https://www.example.com"
-                        className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                        className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                         />
                       </div>
                     </div>
@@ -1492,7 +1467,7 @@ export default function BusinessDashboard() {
                             value={profileData.businessInstagram}
                             onChange={(e) => setProfileData({ ...profileData, businessInstagram: e.target.value })}
                           placeholder="https://instagram.com/yourbusiness"
-                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                           />
                         </div>
                       </div>
@@ -1509,7 +1484,7 @@ export default function BusinessDashboard() {
                             value={profileData.businessFacebook}
                             onChange={(e) => setProfileData({ ...profileData, businessFacebook: e.target.value })}
                           placeholder="https://facebook.com/yourbusiness"
-                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                           />
                         </div>
                       </div>
@@ -1526,7 +1501,7 @@ export default function BusinessDashboard() {
                             value={profileData.businessTikTok}
                             onChange={(e) => setProfileData({ ...profileData, businessTikTok: e.target.value })}
                           placeholder="https://tiktok.com/@yourbusiness"
-                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 pl-12 pr-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800" 
                           />
                         </div>
                       </div>
@@ -1545,7 +1520,7 @@ export default function BusinessDashboard() {
                 <button 
                   type="submit" 
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/25 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-green-500 dark:to-green-600 dark:hover:from-green-600 dark:hover:to-green-700"
                 >
                     {saving ? (
                     <>
@@ -1581,7 +1556,7 @@ export default function BusinessDashboard() {
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="rounded-lg border-0 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:bg-zinc-800"
+                className="rounded-lg border-0 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:bg-zinc-800"
               >
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
@@ -1623,11 +1598,11 @@ export default function BusinessDashboard() {
                       </p>
                   </div>
                 </div>
-                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-white p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
-                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
+                  <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-white p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
+                    <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
                     <div className="relative">
-                      <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Conversion</p>
-                      <p className="mt-3 text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                      <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">Conversion</p>
+                      <p className="mt-3 text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
                         {analytics.summary?.overallConversion?.toFixed(1) || 0}%
                       </p>
                   </div>
@@ -1782,9 +1757,9 @@ export default function BusinessDashboard() {
                     </p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Redemptions per click</p>
                     </div>
-                  <div className="rounded-2xl bg-gradient-to-br from-violet-50/50 to-white p-5 dark:from-violet-950/20 dark:to-zinc-800/30">
-                    <p className="text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Overall</p>
-                    <p className="mt-2 text-2xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                  <div className="rounded-2xl bg-gradient-to-br from-green-50/50 to-white p-5 dark:from-green-950/20 dark:to-zinc-800/30">
+                    <p className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">Overall</p>
+                    <p className="mt-2 text-2xl font-bold tracking-tight text-green-600 dark:text-green-400">
                       {analytics.summary?.overallConversion?.toFixed(1) || 0}%
                     </p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">Redemptions per view</p>
@@ -1812,7 +1787,7 @@ export default function BusinessDashboard() {
             </div>
               </div>
                           <div className="ml-4 text-right">
-                            <p className="text-sm font-semibold text-violet-600 dark:text-violet-400">
+                            <p className="text-sm font-semibold text-green-600 dark:text-green-400">
                               {coupon.views > 0 ? ((coupon.redemptions / coupon.views) * 100).toFixed(1) : 0}%
                             </p>
                             <p className="text-xs text-gray-400 dark:text-zinc-500">conv.</p>
@@ -1878,7 +1853,7 @@ export default function BusinessDashboard() {
             </div>
 
             {/* Invite Link Card */}
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-green-50 to-white p-6 shadow-sm dark:border-zinc-800 dark:from-green-950/20 dark:to-zinc-900">
               <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
                 {tRefer("inviteLink")}
               </h2>
@@ -1891,7 +1866,7 @@ export default function BusinessDashboard() {
                 </div>
                 <button
                   onClick={handleCopyLink}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
                 >
                   {linkCopied ? (
                     <>
@@ -1987,8 +1962,8 @@ export default function BusinessDashboard() {
                 </div>
               ) : invites.length === 0 ? (
                 <div className="p-12 text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
-                    <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                    <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                     </svg>
                   </div>
@@ -2042,9 +2017,9 @@ export default function BusinessDashboard() {
 
             {/* Business Profile Link */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="border-b border-gray-200 bg-gradient-to-r from-violet-50 to-white px-6 py-4 dark:border-zinc-800 dark:from-violet-950/20 dark:to-zinc-900">
+              <div className="border-b border-gray-200 bg-gradient-to-r from-green-50 to-white px-6 py-4 dark:border-zinc-800 dark:from-green-950/20 dark:to-zinc-900">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-green-700">
                     <svg className="h-5 w-5 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
@@ -2058,7 +2033,7 @@ export default function BusinessDashboard() {
               <div className="p-6">
                 <Link
                   href={`/${locale}/dashboard/business?section=profile`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/25 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/30 active:scale-[0.98] dark:from-green-500 dark:to-green-600 dark:hover:from-green-600 dark:hover:to-green-700"
                 >
                   <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2098,14 +2073,14 @@ export default function BusinessDashboard() {
                   </div>
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" defaultChecked className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-violet-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:bg-zinc-700 dark:peer-focus:ring-violet-800 dark:peer-checked:bg-violet-500"></div>
+                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-green-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:bg-zinc-700 dark:peer-focus:ring-green-800 dark:peer-checked:bg-green-500"></div>
                     <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5 dark:bg-zinc-300"></span>
                   </label>
                 </div>
                 <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-800/30">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                      <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                      <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                         <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
@@ -2116,7 +2091,7 @@ export default function BusinessDashboard() {
                   </div>
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" defaultChecked className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-violet-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:bg-zinc-700 dark:peer-focus:ring-violet-800 dark:peer-checked:bg-violet-500"></div>
+                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-green-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:bg-zinc-700 dark:peer-focus:ring-green-800 dark:peer-checked:bg-green-500"></div>
                     <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5 dark:bg-zinc-300"></span>
                   </label>
                 </div>
@@ -2134,7 +2109,7 @@ export default function BusinessDashboard() {
                   </div>
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" defaultChecked className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-violet-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:bg-zinc-700 dark:peer-focus:ring-violet-800 dark:peer-checked:bg-violet-500"></div>
+                    <div className="peer h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-green-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:bg-zinc-700 dark:peer-focus:ring-green-800 dark:peer-checked:bg-green-500"></div>
                     <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5 dark:bg-zinc-300"></span>
                   </label>
                 </div>
@@ -2292,11 +2267,11 @@ export default function BusinessDashboard() {
                     {/* Statistics Cards */}
                     <div className="mb-6 sm:mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                       {/* Total Coupons */}
-                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-violet-950/20 dark:to-zinc-800/30">
-                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-200/50 blur-2xl dark:bg-violet-900/30"></div>
+                      <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-50 to-white p-4 sm:p-6 transition hover:shadow-md dark:from-green-950/20 dark:to-zinc-800/30">
+                        <div className="absolute right-0 top-0 h-20 w-20 sm:h-24 sm:w-24 -translate-y-1/2 translate-x-1/2 rounded-full bg-green-200/50 blur-2xl dark:bg-green-900/30"></div>
                         <div className="relative">
-                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">Total</p>
-                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">Total</p>
+                          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
                             {stats.total}
                           </p>
                           <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-zinc-500">All coupons</p>
@@ -2353,7 +2328,7 @@ export default function BusinessDashboard() {
                   setShowTypeSelection(true)
                   setEditingCouponId(null)
                 }}
-                className="group inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                className="group inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-green-500 dark:to-green-600 dark:shadow-green-500/20 dark:hover:from-green-600 dark:hover:to-green-700"
               >
                 <svg className="h-4 w-4 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                   <path d="M12 4v16m8-8H4" />
@@ -2371,7 +2346,7 @@ export default function BusinessDashboard() {
                     onClick={() => setFilterStatus(status)}
                     className={`flex-1 min-w-[80px] sm:min-w-0 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
                       filterStatus === status
-                        ? "bg-violet-600 text-white shadow-sm"
+                        ? "bg-green-600 text-white shadow-sm"
                         : "text-gray-600 hover:bg-gray-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                     }`}
                   >
@@ -2386,8 +2361,8 @@ export default function BusinessDashboard() {
               <CouponsListSkeleton />
             ) : filteredCoupons.length === 0 ? (
               <div className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white p-8 sm:p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="mx-auto mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
-                  <svg className="h-6 w-6 sm:h-8 sm:w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mx-auto mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                  <svg className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
                 </div>
@@ -2418,8 +2393,8 @@ export default function BusinessDashboard() {
                           />
                         </div>
                       ) : (
-                        <div className="flex h-32 sm:h-20 w-full sm:w-20 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
-                          <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex h-32 sm:h-20 w-full sm:w-20 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30">
+                          <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
                         </div>
@@ -2449,7 +2424,7 @@ export default function BusinessDashboard() {
                               {coupon.couponType === "QR_CODE" && (
                                 <span className="text-gray-600 dark:text-zinc-400">QR Code</span>
                               )}
-                              <span className="font-semibold text-violet-600 dark:text-violet-400">
+                              <span className="font-semibold text-green-600 dark:text-green-400">
                                 {formatDiscountLabel(coupon)}
                               </span>
                               <span className="text-gray-600 dark:text-zinc-400">
@@ -2535,11 +2510,11 @@ export default function BusinessDashboard() {
                     setShowTypeSelection(false)
                     setShowForm(true)
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-violet-500 hover:bg-violet-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-violet-500 dark:hover:bg-violet-900/20"
+                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-green-500 hover:bg-green-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-green-500 dark:hover:bg-green-900/20"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                      <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                       </svg>
                     </div>
@@ -2558,11 +2533,11 @@ export default function BusinessDashboard() {
                     setShowTypeSelection(false)
                     setShowForm(true)
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-violet-500 hover:bg-violet-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-violet-500 dark:hover:bg-violet-900/20"
+                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-green-500 hover:bg-green-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-green-500 dark:hover:bg-green-900/20"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                      <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                       </svg>
                     </div>
@@ -2595,9 +2570,9 @@ export default function BusinessDashboard() {
                 {/* Modal */}
                 <div className="relative z-10 w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl flex flex-col bg-white shadow-2xl dark:bg-zinc-900 overflow-hidden" style={{ animation: 'scaleIn 0.2s ease-out' }}>
                   {/* Header */}
-                  <div className="relative flex items-center justify-between border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-4 py-4 sm:px-6 sm:py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
+                  <div className="relative flex items-center justify-between border-b border-gray-200/50 bg-gradient-to-br from-green-50 via-green-50/50 to-white px-4 py-4 sm:px-6 sm:py-5 dark:border-zinc-800 dark:from-green-950/30 dark:via-green-950/20 dark:to-zinc-900">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                      <div className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-green-700">
                         {editingCouponId ? (
                           <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                             <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2665,7 +2640,7 @@ export default function BusinessDashboard() {
                 {/* Basic Information Card */}
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
                   <div className="mb-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600">
                       <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
@@ -2679,7 +2654,7 @@ export default function BusinessDashboard() {
                   <div className="space-y-5">
                     <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                               {tCouponForm("title")} <span className="text-red-500">*</span>
@@ -2695,7 +2670,7 @@ export default function BusinessDashboard() {
                                 }
                               }}
                               placeholder="e.g., Summer Sale 2024"
-                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.title 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -2713,7 +2688,7 @@ export default function BusinessDashboard() {
 
               <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                         </svg>
                               {tCouponForm("description")} <span className="text-red-500">*</span>
@@ -2729,7 +2704,7 @@ export default function BusinessDashboard() {
                                 }
                               }}
                         placeholder="Describe your coupon offer in detail. What makes it special?"
-                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 resize-none ${
                                 formErrors.description 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -2764,40 +2739,40 @@ export default function BusinessDashboard() {
                   {/* Coupon Type Display (Read-only) */}
                   <div className="mb-6">
                     <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
                       {tCouponForm("couponType")}
                     </label>
-                    <div className="rounded-xl border-2 border-violet-500 bg-gradient-to-br from-violet-50 to-violet-100/50 p-4 dark:border-violet-500 dark:from-violet-900/30 dark:to-violet-900/20">
+                    <div className="rounded-xl border-2 border-green-500 bg-gradient-to-br from-green-50 to-green-100/50 p-4 dark:border-green-500 dark:from-green-900/30 dark:to-green-900/20">
                       <div className="flex items-center gap-3">
                         {formData.couponType === "ONLINE_CODE" ? (
                           <>
-                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                               </svg>
                             </div>
                             <div className="flex-1">
-                              <div className="font-semibold text-violet-700 dark:text-violet-300">{tCouponForm("onlineCode")}</div>
+                              <div className="font-semibold text-green-700 dark:text-green-300">{tCouponForm("onlineCode")}</div>
                               <div className="text-xs text-gray-600 dark:text-zinc-400">{tCouponForm("onlineCodeDescription")}</div>
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                               </svg>
                             </div>
                             <div className="flex-1">
-                              <div className="font-semibold text-violet-700 dark:text-violet-300">{tCouponForm("qrCode")}</div>
+                              <div className="font-semibold text-green-700 dark:text-green-300">{tCouponForm("qrCode")}</div>
                               <div className="text-xs text-gray-600 dark:text-zinc-400">{tCouponForm("qrCodeDescription")}</div>
                             </div>
                           </>
                         )}
                         <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
@@ -2809,7 +2784,7 @@ export default function BusinessDashboard() {
                     {formData.couponType === "ONLINE_CODE" && (
                       <div>
                         <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                           </svg>
                               {tCouponForm("code")} <span className="text-red-500">*</span>
@@ -2825,7 +2800,7 @@ export default function BusinessDashboard() {
                                 }
                               }}
                           placeholder="e.g., SUMMER2024"
-                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.code 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                               : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -2844,7 +2819,7 @@ export default function BusinessDashboard() {
 
                 <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                               {tCouponForm("category")} <span className="text-red-500">*</span>
@@ -2858,7 +2833,7 @@ export default function BusinessDashboard() {
                                   setFormErrors({ ...formErrors, categoryId: undefined })
                                 }
                               }}
-                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')] bg-[length:1.5rem] bg-[right_0.75rem_center] bg-no-repeat ${
                                 formErrors.categoryId 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -2884,7 +2859,7 @@ export default function BusinessDashboard() {
                 {/* Discount Type */}
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                    <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     {tCouponForm("discountType")} <span className="text-red-500">*</span>
@@ -2895,7 +2870,7 @@ export default function BusinessDashboard() {
                       onClick={() => setFormData({ ...formData, discountType: "PERCENT", discountAmount: undefined })}
                       className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
                         formData.discountType === "PERCENT"
-                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                           : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
@@ -2906,7 +2881,7 @@ export default function BusinessDashboard() {
                       onClick={() => setFormData({ ...formData, discountType: "FIXED", discountPercentage: undefined })}
                       className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
                         formData.discountType === "FIXED"
-                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                           : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
@@ -2917,7 +2892,7 @@ export default function BusinessDashboard() {
                       onClick={() => setFormData({ ...formData, discountType: "BOGO_1_1", discountPercentage: undefined, discountAmount: undefined })}
                       className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
                         formData.discountType === "BOGO_1_1"
-                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                           : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
@@ -2928,7 +2903,7 @@ export default function BusinessDashboard() {
                       onClick={() => setFormData({ ...formData, discountType: "BOGO_2_1", discountPercentage: undefined, discountAmount: undefined })}
                       className={`rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition ${
                         formData.discountType === "BOGO_2_1"
-                          ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                           : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
@@ -2941,7 +2916,7 @@ export default function BusinessDashboard() {
                 {formData.discountType === "PERCENT" && (
                   <div>
                     <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       {tCouponForm("discountPercentage")} <span className="text-red-500">*</span>
@@ -2960,13 +2935,13 @@ export default function BusinessDashboard() {
                           }
                         }}
                         placeholder="20"
-                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                           formErrors.discountPercentage 
                             ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
                         }`}
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">%</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-green-600 dark:text-green-400 pointer-events-none">%</span>
                     </div>
                     {formErrors.discountPercentage && (
                       <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
@@ -2982,7 +2957,7 @@ export default function BusinessDashboard() {
                 {formData.discountType === "FIXED" && (
                   <div>
                     <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                      <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       {tCouponForm("discountAmount")} <span className="text-red-500">*</span>
@@ -3001,13 +2976,13 @@ export default function BusinessDashboard() {
                           }
                         }}
                         placeholder="5.00"
-                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                           formErrors.discountAmount 
                             ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
                         }`}
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-violet-600 dark:text-violet-400 pointer-events-none">€</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-green-600 dark:text-green-400 pointer-events-none">€</span>
                     </div>
                     {formErrors.discountAmount && (
                       <p className="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
@@ -3021,8 +2996,8 @@ export default function BusinessDashboard() {
                 )}
 
                 {(formData.discountType === "BOGO_1_1" || formData.discountType === "BOGO_2_1") && (
-                  <div className="rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-4">
-                    <p className="text-sm text-violet-700 dark:text-violet-300">
+                  <div className="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4">
+                    <p className="text-sm text-green-700 dark:text-green-300">
                       {formData.discountType === "BOGO_1_1" 
                         ? "Buy 1, Get 1 Free - Customer gets one item free when buying one item"
                         : "Buy 2, Get 1 Free - Customer gets one item free when buying two items"}
@@ -3032,7 +3007,7 @@ export default function BusinessDashboard() {
 
                 <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                               {tCouponForm("expirationDate")} <span className="text-red-500">*</span>
@@ -3048,7 +3023,7 @@ export default function BusinessDashboard() {
                                 }
                               }}
                               min={new Date().toISOString().split('T')[0]}
-                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                        className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                 formErrors.expirationDate 
                                   ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                             : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -3083,7 +3058,7 @@ export default function BusinessDashboard() {
                   <div className="space-y-5">
                     <div>
                       <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                        <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         {tCouponForm("usageLimitType")} <span className="text-red-500">*</span>
@@ -3102,7 +3077,7 @@ export default function BusinessDashboard() {
                             setFormErrors({ ...formErrors, maxUsesPerUser: undefined })
                           }
                         }}
-                        className="block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-gray-50 dark:bg-zinc-800/50"
+                        className="block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 appearance-none bg-gray-50 dark:bg-zinc-800/50"
                       >
                         <option value="SINGLE_USE">{tCouponForm("singleUse")}</option>
                         <option value="MULTIPLE_USE">{tCouponForm("multipleUses")}</option>
@@ -3113,7 +3088,7 @@ export default function BusinessDashboard() {
                     {formData.usageLimitType === "MULTIPLE_USE" && (
                       <div>
                         <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                           </svg>
                           {tCouponForm("maxUsesPerUser")} <span className="text-red-500">*</span>
@@ -3131,7 +3106,7 @@ export default function BusinessDashboard() {
                             }
                           }}
                           placeholder="e.g., 5"
-                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                          className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                             formErrors.maxUsesPerUser 
                               ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                               : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -3154,7 +3129,7 @@ export default function BusinessDashboard() {
                 {formData.couponType === "QR_CODE" && (
                   <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
                     <div className="mb-6 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-pink-600">
                         <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -3168,7 +3143,7 @@ export default function BusinessDashboard() {
                     <div className="space-y-5">
                       <div>
                         <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                          <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           {tCouponForm("enableTimeRestrictions")}
@@ -3184,7 +3159,7 @@ export default function BusinessDashboard() {
                             }}
                             className={`flex-1 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
                               formData.hasTimeRestrictions
-                                ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 dark:border-green-500"
                                 : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
                             }`}
                           >
@@ -3209,7 +3184,7 @@ export default function BusinessDashboard() {
                             }}
                             className={`flex-1 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
                               !formData.hasTimeRestrictions
-                                ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 dark:border-green-500"
                                 : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
                             }`}
                           >
@@ -3222,7 +3197,7 @@ export default function BusinessDashboard() {
                         <>
                           <div>
                             <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                              <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                               {tCouponForm("validDays")} <span className="text-red-500">*</span>
@@ -3241,7 +3216,7 @@ export default function BusinessDashboard() {
                                   key={day.value}
                                   className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
                                     formData.validDays?.includes(day.value)
-                                      ? "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-500"
+                                      ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 dark:border-green-500"
                                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
                                   }`}
                                 >
@@ -3258,7 +3233,7 @@ export default function BusinessDashboard() {
                                         setFormErrors({ ...formErrors, validDays: undefined })
                                       }
                                     }}
-                                    className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                                   />
                                   {day.label}
                                 </label>
@@ -3277,7 +3252,7 @@ export default function BusinessDashboard() {
                           <div className="grid gap-5 sm:grid-cols-2">
                             <div>
                               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {tCouponForm("startHour")} <span className="text-red-500">*</span>
@@ -3296,7 +3271,7 @@ export default function BusinessDashboard() {
                                   }
                                 }}
                                 placeholder="0-23"
-                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                   formErrors.validStartHour 
                                     ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                                     : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -3314,7 +3289,7 @@ export default function BusinessDashboard() {
 
                             <div>
                               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                                <svg className="h-4 w-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {tCouponForm("endHour")} <span className="text-red-500">*</span>
@@ -3333,7 +3308,7 @@ export default function BusinessDashboard() {
                                   }
                                 }}
                                 placeholder="0-23"
-                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:shadow-lg focus:shadow-violet-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
+                                className={`block w-full rounded-xl border-0 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:text-zinc-100 dark:focus:bg-zinc-800 ${
                                   formErrors.validEndHour 
                                     ? 'bg-red-50 ring-2 ring-red-500/30 focus:ring-red-500/30 dark:bg-red-900/10' 
                                     : 'bg-gray-50 dark:bg-zinc-800/50'
@@ -3371,7 +3346,7 @@ export default function BusinessDashboard() {
 
                   <div className="space-y-4">
                     {!formData.imagePath ? (
-                      <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8 transition-all hover:border-violet-400 hover:bg-violet-50/30 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-violet-600 dark:hover:bg-violet-900/20">
+                      <label className="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8 transition-all hover:border-green-400 hover:bg-green-50/30 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-600 dark:hover:bg-green-900/20">
                 <input
                   type="file"
                   accept="image/jpeg,image/jpg,image/png,image/webp"
@@ -3381,16 +3356,16 @@ export default function BusinessDashboard() {
                         />
                         {uploadingImage ? (
                           <div className="flex flex-col items-center gap-3">
-                            <svg className="h-12 w-12 animate-spin text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24">
+                            <svg className="h-12 w-12 animate-spin text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                                <span className="text-sm font-medium text-violet-700 dark:text-violet-300">{tCommon("loading")}...</span>
+                                <span className="text-sm font-medium text-green-700 dark:text-green-300">{tCommon("loading")}...</span>
                       </div>
                         ) : (
                           <>
-                            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30">
-                              <svg className="h-8 w-8 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30">
+                              <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                               </svg>
                 </div>
@@ -3456,7 +3431,7 @@ export default function BusinessDashboard() {
                         type="submit"
                         form="create-coupon-form"
                         disabled={submitting || uploadingImage}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-violet-500 dark:to-violet-600 dark:hover:from-violet-600 dark:hover:to-violet-700 sm:w-auto"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/25 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-green-500 dark:to-green-600 dark:hover:from-green-600 dark:hover:to-green-700 sm:w-auto"
                       >
                         {submitting ? (
                           <>

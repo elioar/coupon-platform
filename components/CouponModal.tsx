@@ -148,7 +148,7 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
           try {
             document.execCommand('copy')
           } catch (err) {
-            console.error('Failed to copy using execCommand:', err)
+            // Failed to copy - handled below
           }
           
           document.body.removeChild(textArea)
@@ -159,7 +159,6 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
         trackCouponEvent(coupon.id, "REDEMPTION", session?.user?.id)
         setTimeout(() => setCopied(false), 2000)
       } catch (error) {
-        console.error('Failed to copy coupon code:', error)
         // Still track the redemption even if copy fails
         trackCouponEvent(coupon.id, "REDEMPTION", session?.user?.id)
         // Show a message or handle the error gracefully

@@ -105,7 +105,7 @@ export default function BusinessRegisterPage() {
         const data = await res.json()
         setCategories(data.categories || [])
       } catch (err) {
-        console.error("Failed to load categories", err)
+        // Failed to load categories - silently fail
       }
     }
     fetchCategories()
@@ -220,7 +220,6 @@ export default function BusinessRegisterPage() {
       businessForm.reset()
       router.push(`/${locale}/login`)
     } catch (err) {
-      console.error(err)
       setError(t("error"))
     } finally {
       setBusinessSubmitting(false)

@@ -256,8 +256,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
     })
 
     if (code) {
-      console.log("✅✅✅ QR Code detected!", code.data)
-      
       const trimmedText = code.data.trim()
       setLastScannedCode(trimmedText)
       setScanAttempts(prev => prev + 1)
@@ -273,7 +271,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
           return
         }
         
-        console.log("✅✅✅ Valid QR token found! Processing...")
         stopScanner()
         
         // Show processing state (neutral, not success)
@@ -306,7 +303,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
             }
           }
         }).catch((error: any) => {
-          console.error("Redemption error:", error)
           setIsProcessing(false)
           setError(error?.message || "Failed to process redemption")
           setShowSuccess(false)
@@ -314,7 +310,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
         })
         return // Don't continue scanning after processing
       } else {
-        console.warn(`⚠️ Scanned code is not a valid QR token. Expected: qr_xxxxx, got: "${trimmedText.substring(0, 50)}"`)
         if (scanAttempts > 15) {
           setError(`Scanned code doesn't match expected format. Make sure you're scanning the QR code from the "Show QR" button. Last scanned: "${trimmedText.substring(0, 30)}${trimmedText.length > 30 ? '...' : ''}"`)
         }
@@ -365,8 +360,8 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
                   animationFrameRef.current = requestAnimationFrame(scanQRCode)
                 }
               }, 100)
-            }).catch((err) => {
-              console.error("Error playing video:", err)
+            }).catch(() => {
+              // Error playing video - silently fail
             })
           }
         }
@@ -379,7 +374,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
         }
       }
     } catch (err: any) {
-      console.error("Error starting camera:", err)
       let errorMsg = "Failed to start camera"
       
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
@@ -460,7 +454,6 @@ export default function QRScanner({ onScanSuccess, onClose, onRedemptionError }:
                 }
               }
             }).catch((error: any) => {
-              console.error("Redemption error:", error)
               setIsProcessing(false)
               setError(error?.message || "Failed to process redemption")
               setShowSuccess(false)

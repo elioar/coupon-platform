@@ -177,7 +177,6 @@ export async function PUT(request: NextRequest) {
     if (user.role === Role.BUSINESS && payload.businessLatitude != null && payload.businessLongitude != null) {
       nextLatitude = payload.businessLatitude
       nextLongitude = payload.businessLongitude
-      console.log("✅ Using provided coordinates from map picker:", { lat: nextLatitude, lng: nextLongitude })
     } else if (user.role === Role.BUSINESS) {
       // Otherwise, try to geocode the address
       const locationForGeocode =
@@ -187,25 +186,21 @@ export async function PUT(request: NextRequest) {
 
       if (locationForGeocode) {
         try {
-          console.log("🔄 Geocoding address:", locationForGeocode)
           const coordinates = await geocodeAddress(locationForGeocode, preferredLanguage)
           if (coordinates) {
             nextLatitude = coordinates.latitude
             nextLongitude = coordinates.longitude
-            console.log("✅ Geocoded successfully:", { lat: nextLatitude, lng: nextLongitude })
           } else {
-            console.warn("⚠️ Geocoding returned no coordinates for:", locationForGeocode)
             nextLatitude = null
             nextLongitude = null
           }
         } catch (geocodeError) {
-          console.error("❌ Failed to geocode business location:", geocodeError)
+          console.error("Failed to geocode business location:", geocodeError)
           nextLatitude = null
           nextLongitude = null
         }
       } else {
         // No location provided, clear coordinates
-        console.log("ℹ️ No location provided, clearing coordinates")
         nextLatitude = null
         nextLongitude = null
       }

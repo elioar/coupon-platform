@@ -1,4 +1,4 @@
-# CouponMe - Discount Coupon Platform
+# VibePeek - Discount Coupon Platform
 
 A modern, full-stack web platform where users and businesses can register and interact with discount coupons. Built with Next.js 16, TypeScript, Prisma, and Tailwind CSS.
 
@@ -44,15 +44,15 @@ A modern, full-stack web platform where users and businesses can register and in
 
 1. **Clone and install dependencies:**
    ```bash
-   cd coupon-me
+   cd VibePeek
    npm install
    ```
 
 2. **Set up environment variables:**
-   Create a `.env` file in the `coupon-me` directory:
+   Create a `.env` file in the `VibePeek` directory:
    ```env
    # Database
-   DATABASE_URL="postgresql://user:password@localhost:5432/couponme?schema=public"
+   DATABASE_URL="postgresql://user:password@localhost:5432/VibePeek?schema=public"
 
    # NextAuth
    NEXTAUTH_SECRET="your-secret-key-here-generate-with-openssl-rand-base64-32"
@@ -107,7 +107,7 @@ Since the first user needs to be an admin, you'll need to manually update the da
 ## 📁 Project Structure
 
 ```
-coupon-me/
+VibePeek/
 ├── app/
 │   ├── [locale]/                 # Internationalized routes
 │   │   ├── coupons/             # Public coupons listing

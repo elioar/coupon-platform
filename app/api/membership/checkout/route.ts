@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'CouponMe Annual Membership',
+              name: 'VibePeek Annual Membership',
               description: 'Unlock unlimited access to all coupon codes for one year',
             },
             unit_amount: MEMBERSHIP_PRICE,

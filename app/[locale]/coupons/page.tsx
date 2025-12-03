@@ -222,7 +222,7 @@ export default function CouponsPage() {
         setLocationError(null)
       },
       (error) => {
-        console.error("Geolocation error:", error)
+        // Geolocation error - handled silently
         const reason = (() => {
           switch (error.code) {
             case error.PERMISSION_DENIED:
@@ -300,7 +300,7 @@ export default function CouponsPage() {
           setLocationDescription(t("nearMeCurrentLocation", { city: label }))
         }
       } catch (error) {
-        console.error("Reverse geocoding failed:", error)
+        // Reverse geocoding failed - handled silently
         if (!cancelled) {
           setLocationDescription(t("nearMeCurrentLocation", { city: t("nearMeUnknownCity") }))
         }
@@ -371,18 +371,7 @@ export default function CouponsPage() {
             (coupon) => typeof coupon.distanceKm === "number" && coupon.distanceKm != null
           )
           
-          // Debug logging
-          if (process.env.NODE_ENV === "development") {
-            console.log("Near Me Filter:", {
-              totalCoupons: filteredCoupons.length,
-              couponsWithCoordinates: couponsWithDistance.filter(
-                (c) => c.business?.businessLatitude != null && c.business?.businessLongitude != null
-              ).length,
-              couponsWithDistance: withDistance.length,
-              userLocation,
-            })
-          }
-          
+          // Near Me Filter applied
           return withDistance.sort((a, b) => (a.distanceKm! - b.distanceKm!))
         })()
       : couponsWithDistance
@@ -410,7 +399,7 @@ export default function CouponsPage() {
         setAllCoupons(couponsData.coupons || [])
         setCategories(categoriesData.categories || [])
       } catch (error) {
-        console.error("Error fetching data:", error)
+        // Error fetching data - handled silently
       } finally {
         setLoading(false)
       }

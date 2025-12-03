@@ -1,7 +1,7 @@
-# CouponMe Project Summary
+# VibePeek Project Summary
 
 ## Overview
-CouponMe is a comprehensive, production-ready discount coupon platform built with modern web technologies. The platform enables users, businesses, and administrators to interact with a curated collection of discount coupons through a secure, multilingual interface.
+VibePeek is a comprehensive, production-ready discount coupon platform built with modern web technologies. The platform enables users, businesses, and administrators to interact with a curated collection of discount coupons through a secure, multilingual interface.
 
 ## ✅ Completed Implementation
 

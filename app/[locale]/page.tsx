@@ -128,7 +128,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
           });
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        // Error fetching data - silently fail
       } finally {
         setLoading(false);
       }

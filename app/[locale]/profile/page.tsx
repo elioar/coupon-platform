@@ -119,7 +119,7 @@ export default function ProfilePage() {
         const data = await res.json()
         setCategories(data.categories || [])
       } catch (error) {
-        console.error("Failed to load categories", error)
+        // Failed to load categories - handled silently
       }
     }
     fetchCategories()
@@ -159,7 +159,6 @@ export default function ProfilePage() {
           businessPostalCode: meta.postalCode,
         })
       } catch (error) {
-        console.error(error)
         setMessage({ type: "error", text: tProfile("error") })
       } finally {
         setLoadingProfile(false)
@@ -242,7 +241,6 @@ export default function ProfilePage() {
       setMessage({ type: "success", text: tProfile("success") })
       await update({ name: profile.name ?? "" })
     } catch (error) {
-      console.error(error)
       setMessage({ type: "error", text: tProfile("error") })
     } finally {
       setSaving(false)

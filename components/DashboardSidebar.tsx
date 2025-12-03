@@ -325,7 +325,7 @@ export default function DashboardSidebar({
         <div className="flex h-full flex-col">
           {/* Logo/Brand Header */}
           <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6 dark:border-zinc-800">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600">
               <svg
                 className="h-6 w-6 text-white"
                 fill="none"
@@ -339,7 +339,7 @@ export default function DashboardSidebar({
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">CouponHub</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">VibePeek</h2>
               <p className="text-xs text-gray-500 dark:text-zinc-400">Dashboard</p>
             </div>
           </div>
@@ -378,7 +378,7 @@ export default function DashboardSidebar({
                       onClick={closeMobileMenu}
                       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
                         isActiveLink
-                          ? "bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-lg shadow-violet-500/50 dark:from-violet-500 dark:to-violet-600"
+                          ? "bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/50 dark:from-green-500 dark:to-green-600"
                           : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                       }`}
                     >
@@ -403,7 +403,7 @@ export default function DashboardSidebar({
                     }
                     closeMobileMenu()
                   }}
-                  className="group w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-2.5 py-2 text-[10px] sm:text-xs font-semibold text-white shadow-lg shadow-violet-500/30 transition-all duration-200 hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-violet-500 dark:to-violet-600 dark:shadow-violet-500/20 dark:hover:from-violet-600 dark:hover:to-violet-700"
+                  className="group w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-green-600 to-green-700 px-2.5 py-2 text-[10px] sm:text-xs font-semibold text-white shadow-lg shadow-green-500/30 transition-all duration-200 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] dark:from-green-500 dark:to-green-600 dark:shadow-green-500/20 dark:hover:from-green-600 dark:hover:to-green-700"
                 >
                   <svg className="h-3.5 w-3.5 flex-shrink-0 transition-transform group-hover:rotate-90" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M12 4v16m8-8H4" />
@@ -428,7 +428,7 @@ export default function DashboardSidebar({
                     }}
                     className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
                       locale === "en"
-                        ? "bg-violet-600 text-white"
+                        ? "bg-green-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     }`}
                   >
@@ -445,7 +445,7 @@ export default function DashboardSidebar({
                     }}
                     className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
                       locale === "el"
-                        ? "bg-violet-600 text-white"
+                        ? "bg-green-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                     }`}
                   >
@@ -490,7 +490,7 @@ export default function DashboardSidebar({
           {/* Footer - User Info */}
           <div className="border-t border-gray-200 p-4 dark:border-zinc-800">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-sm font-bold text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-sm font-bold text-white">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 overflow-hidden">
@@ -532,9 +532,9 @@ export default function DashboardSidebar({
             style={{ animation: 'scaleIn 0.2s ease-out' }}
           >
             {/* Header */}
-            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-violet-50 via-violet-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:via-violet-950/20 dark:to-zinc-900">
+            <div className="relative border-b border-gray-200/50 bg-gradient-to-br from-green-50 via-green-50/50 to-white px-6 py-5 dark:border-zinc-800 dark:from-green-950/30 dark:via-green-950/20 dark:to-zinc-900">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-500/25 dark:from-violet-600 dark:to-violet-700">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600 shadow-lg shadow-green-500/25 dark:from-green-600 dark:to-green-700">
                   <svg className="h-6 w-6 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
                     <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>

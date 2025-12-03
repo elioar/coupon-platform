@@ -378,7 +378,6 @@ export default function GoogleMapPicker({
         })
       })
       .catch((error) => {
-        console.error("Error loading Google Maps:", error)
         setIsLoading(false)
       })
 

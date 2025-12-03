@@ -291,12 +291,12 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
             </h3>
             <button
               onClick={toggleSave}
-              className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-all hover:bg-zinc-100 hover:text-violet-600 active:scale-95 dark:hover:bg-zinc-800 dark:hover:text-violet-400"
+              className="flex-shrink-0 rounded-lg p-2 text-zinc-400 transition-all hover:bg-zinc-100 hover:text-green-600 active:scale-95 dark:hover:bg-zinc-800 dark:hover:text-green-400"
               aria-label={isSaved ? t("unsaveCoupon") : t("saveCoupon")}
               title={isSaved ? t("unsaveCoupon") : t("saveCoupon")}
             >
               {isSaved ? (
-                <svg className="h-5 w-5 fill-violet-600 text-violet-600 dark:fill-violet-400 dark:text-violet-400" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 fill-green-600 text-green-600 dark:fill-green-400 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                 </svg>
               ) : (

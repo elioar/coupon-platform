@@ -1,13 +1,13 @@
-# CouponMe Setup Guide
+# VibePeek Setup Guide
 
-This guide will help you get CouponMe up and running on your local machine.
+This guide will help you get VibePeek up and running on your local machine.
 
 ## Step-by-Step Setup
 
 ### 1. Install Dependencies
 
 ```bash
-cd coupon-me
+cd VibePeek
 npm install
 ```
 
@@ -17,16 +17,16 @@ npm install
 1. Install PostgreSQL from https://www.postgresql.org/download/
 2. Create a new database:
    ```sql
-   CREATE DATABASE couponme;
+   CREATE DATABASE VibePeek;
    ```
-3. Note your connection string: `postgresql://user:password@localhost:5432/couponme`
+3. Note your connection string: `postgresql://user:password@localhost:5432/VibePeek`
 
 #### Option B: Docker
 ```bash
-docker run --name couponme-postgres \
-  -e POSTGRES_DB=couponme \
-  -e POSTGRES_USER=couponme \
-  -e POSTGRES_PASSWORD=couponme123 \
+docker run --name VibePeek-postgres \
+  -e POSTGRES_DB=VibePeek \
+  -e POSTGRES_USER=VibePeek \
+  -e POSTGRES_PASSWORD=VibePeek123 \
   -p 5432:5432 \
   -d postgres:15
 ```
@@ -38,11 +38,11 @@ docker run --name couponme-postgres \
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file in the `coupon-me` directory:
+Create a `.env` file in the `VibePeek` directory:
 
 ```env
 # Database - Update with your actual database URL
-DATABASE_URL="postgresql://couponme:couponme123@localhost:5432/couponme?schema=public"
+DATABASE_URL="postgresql://VibePeek:VibePeek123@localhost:5432/VibePeek?schema=public"
 
 # NextAuth - Generate a secret key
 # Run: openssl rand -base64 32
