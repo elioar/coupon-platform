@@ -30,12 +30,17 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/en/membership?success=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/en/membership/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/en/membership?canceled=true`,
       client_reference_id: user.id,
+      customer_email: user.email || undefined,
       metadata: {
         userId: user.id,
         type: 'membership',
+      },
+      // Enable automatic tax if configured
+      automatic_tax: {
+        enabled: false,
       },
     })
 

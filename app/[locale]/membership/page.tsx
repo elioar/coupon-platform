@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -52,6 +52,25 @@ export default function MembershipPage() {
   const yearlyPricePerMonth = yearlyPrice / 12
 
   const isMember = session?.user?.membershipExpiry && new Date(session.user.membershipExpiry) > new Date()
+  
+  // Calculate days remaining
+  const daysRemaining = useMemo(() => {
+    if (!session?.user?.membershipExpiry) return 0
+    const expiry = new Date(session.user.membershipExpiry)
+    const now = new Date()
+    const diff = expiry.getTime() - now.getTime()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  }, [session?.user?.membershipExpiry])
+
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  }
 
   // Animation variants
   const containerVariants = {
@@ -130,6 +149,194 @@ export default function MembershipPage() {
     }),
   }
 
+  // Active Member Design
+  if (isMember && session?.user?.membershipExpiry) {
+    return (
+      <div className="flex min-h-screen flex-col bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950 dark:via-zinc-900 dark:to-teal-950">
+        <Navigation />
+
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+          {/* Success Message */}
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, type: "spring" }}
+              className="mb-6 rounded-xl border-2 border-green-400 bg-gradient-to-r from-green-100 to-emerald-100 p-4 shadow-xl dark:border-green-600 dark:from-green-900/40 dark:to-emerald-900/40 sm:mb-8 sm:p-5"
+            >
+              <div className="flex items-center justify-center gap-3">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 10, 0] }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="text-3xl"
+                >
+                  🎉
+                </motion.div>
+                <p className="text-center text-sm font-bold text-green-800 dark:text-green-300 sm:text-base">
+                  {t("congratulations")} {t("thankYou")}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Hero Section - Active Member */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="mb-8 text-center sm:mb-10"
+          >
+            <motion.div
+              variants={badgeVariants}
+              className="mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-4 py-2 text-sm font-bold text-white shadow-2xl sm:px-6 sm:py-2.5 sm:text-base"
+            >
+              <svg
+                className="h-5 w-5 sm:h-6 sm:w-6"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {t("membershipActive")}
+            </motion.div>
+            
+            <motion.h1
+              variants={itemVariants}
+              className="mb-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-3xl font-extrabold text-transparent dark:from-emerald-400 dark:via-green-400 dark:to-teal-400 sm:mb-6 sm:text-5xl lg:text-6xl"
+            >
+              {t("congratulations")}
+            </motion.h1>
+            
+            <motion.p
+              variants={itemVariants}
+              className="mx-auto max-w-2xl text-base font-semibold text-emerald-700 dark:text-emerald-300 sm:text-lg lg:text-xl"
+            >
+              {t("youAreMember")}
+            </motion.p>
+            
+            <motion.p
+              variants={itemVariants}
+              className="mx-auto mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-300 sm:text-base"
+            >
+              {t("enjoyBenefits")}
+            </motion.p>
+          </motion.div>
+
+          {/* Membership Status Card */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mx-auto mb-8 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-white via-emerald-50/50 to-green-50 p-6 shadow-2xl dark:border-emerald-700 dark:from-zinc-900 dark:via-emerald-950/30 dark:to-green-950/30 sm:p-8"
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="mb-1 text-lg font-bold text-zinc-900 dark:text-zinc-50 sm:text-xl">
+                  {t("membershipDetails")}
+                </h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  {t("premiumAccess")}
+                </p>
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg sm:h-16 sm:w-16"
+              >
+                <svg
+                  className="h-8 w-8 text-white sm:h-9 sm:w-9"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </motion.div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg bg-white/60 p-4 dark:bg-zinc-800/60">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t("validUntil")}
+                </span>
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                  {formatDate(session.user.membershipExpiry)}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between rounded-lg bg-white/60 p-4 dark:bg-zinc-800/60">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t("unlimitedAccess")}
+                </span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400">
+                  {daysRemaining > 0 ? t("daysRemaining", { days: daysRemaining }) : t("expiresTomorrow")}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <Link
+                href={`/${locale}/coupons`}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-green-700 hover:shadow-xl sm:py-3.5 sm:text-base"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                {t("viewCoupons")}
+              </Link>
+            </div>
+          </motion.div>
+
+          {/* Active Benefits Grid */}
+          <div className="mx-auto mb-8 grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: "✓", title: t("benefits.unlimited"), color: "from-emerald-500 to-green-500" },
+              { icon: "⭐", title: t("benefits.exclusive"), color: "from-amber-500 to-orange-500" },
+              { icon: "⚡", title: t("benefits.early"), color: "from-blue-500 to-cyan-500" },
+              { icon: "💬", title: t("benefits.support"), color: "from-purple-500 to-pink-500" },
+            ].map((benefit, index) => (
+              <motion.div
+                key={index}
+                custom={index}
+                variants={featureCardVariants}
+                initial="hidden"
+                animate="visible"
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="group rounded-xl border-2 border-white/50 bg-white/80 p-5 shadow-lg backdrop-blur-sm transition-all hover:border-emerald-300 hover:shadow-xl dark:border-zinc-700/50 dark:bg-zinc-800/80 dark:hover:border-emerald-600 sm:p-6"
+              >
+                <div className={`mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${benefit.color} text-2xl shadow-lg sm:h-14 sm:w-14 sm:text-2xl`}>
+                  {benefit.icon}
+                </div>
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 sm:text-base">
+                  {benefit.title.split(" ")[0]}
+                </h4>
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400 sm:text-sm">
+                  {benefit.title.split(" ").slice(1).join(" ")}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Non-Member Design (Original)
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
       <Navigation />

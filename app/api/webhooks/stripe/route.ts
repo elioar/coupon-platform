@@ -11,6 +11,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("STRIPE_WEBHOOK_SECRET is not configured")
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 }
+    )
+  }
+
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
 
@@ -27,12 +35,13 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     )
   } catch (err) {
-    console.error("Webhook signature verification failed:", err)
+    const errorMessage = err instanceof Error ? err.message : "Unknown error"
+    console.error("Webhook signature verification failed:", errorMessage)
     return NextResponse.json(
-      { error: "Invalid signature" },
+      { error: "Invalid signature", details: errorMessage },
       { status: 400 }
     )
   }
@@ -42,14 +51,33 @@ export async function POST(request: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
 
+        // Only process successful payments
+        if (session.payment_status !== "paid") {
+          console.log(`Checkout session ${session.id} not paid yet, status: ${session.payment_status}`)
+          break
+        }
+
         // Extract user ID from metadata
         const userId = session.metadata?.userId || session.client_reference_id
 
         if (!userId) {
-          console.error("No user ID found in checkout session")
+          console.error("No user ID found in checkout session", session.id)
           return NextResponse.json(
             { error: "No user ID found" },
             { status: 400 }
+          )
+        }
+
+        // Verify user exists
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+        })
+
+        if (!user) {
+          console.error(`User ${userId} not found for checkout session ${session.id}`)
+          return NextResponse.json(
+            { error: "User not found" },
+            { status: 404 }
           )
         }
 
@@ -65,7 +93,7 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        console.log(`Membership activated for user ${userId} until ${expiryDate}`)
+        console.log(`✅ Membership activated for user ${userId} until ${expiryDate.toISOString()}`)
         break
       }
 
