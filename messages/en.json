@@ -14,7 +14,10 @@
     "filter": "Filter",
     "all": "All",
     "close": "Close",
-    "coupons": "Coupons"
+    "coupons": "Coupons",
+    "view": "View",
+    "redirectingIn": "Redirecting in",
+    "seconds": "seconds"
   },
   "nav": {
     "home": "Home",
@@ -255,7 +258,17 @@
     "unlimitedAccessToCodes": "Unlimited access to all coupon codes",
     "exclusiveDeals": "Exclusive deals from top brands",
     "earlyAccess": "Early access to new coupons",
-    "prioritySupport": "Priority customer support"
+    "prioritySupport": "Priority customer support",
+    "congratulations": "Congratulations!",
+    "youAreMember": "You're a Premium Member",
+    "enjoyBenefits": "Enjoy all the exclusive benefits",
+    "membershipActive": "Your membership is active",
+    "viewCoupons": "View All Coupons",
+    "renewEarly": "Renew Early",
+    "daysRemaining": "{days} days remaining",
+    "membershipDetails": "Membership Details",
+    "startedOn": "Started on",
+    "validUntil": "Valid until"
   },
   "coupons": {
     "title": "Available Coupons",

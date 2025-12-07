@@ -71,27 +71,77 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 BLOB_READ_WRITE_TOKEN="vercel_blob_rw_your_token_here"
 ```
 
-### 4. Set Up Stripe
+### 4. Set Up Stripe (Test Mode)
+
+This application uses **Stripe SDK 20.0.0** with API version `2025-11-17.clover` (latest as of 2025).
+
+#### Getting Your Test API Keys
 
 1. Create a Stripe account: https://dashboard.stripe.com/register
-2. Get your API keys from: https://dashboard.stripe.com/test/apikeys
-3. Copy the secret key to `.env` as `STRIPE_SECRET_KEY`
-4. Copy the publishable key to `.env` as `STRIPE_PUBLISHABLE_KEY`
+2. Navigate to: https://dashboard.stripe.com/test/apikeys
+3. Copy your **Secret key** (starts with `sk_test_`) to `.env` as `STRIPE_SECRET_KEY`
+4. Copy your **Publishable key** (starts with `pk_test_`) to `.env` as `STRIPE_PUBLISHABLE_KEY`
 
-For webhook testing locally:
-```bash
-# Install Stripe CLI
-# Mac: brew install stripe/stripe-cli/stripe
-# Windows: scoop install stripe
-# Or download from: https://github.com/stripe/stripe-cli/releases
+**Note**: Make sure you're copying keys from **Test mode** (toggle in the top right of Stripe Dashboard)
 
-# Login to Stripe
-stripe login
+#### Setting Up Webhooks for Local Testing
 
-# Forward webhooks to local server
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-# Copy the webhook signing secret (starts with whsec_) to .env
-```
+To test webhook events locally (required for membership activation):
+
+1. **Install Stripe CLI**:
+   ```bash
+   # Mac
+   brew install stripe/stripe-cli/stripe
+   
+   # Windows (using Scoop)
+   scoop install stripe
+   
+   # Or download from: https://github.com/stripe/stripe-cli/releases
+   ```
+
+2. **Login to Stripe**:
+   ```bash
+   stripe login
+   ```
+
+3. **Forward webhooks to your local server**:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   ```
+
+4. **Copy the webhook signing secret**:
+   - The CLI will output a webhook signing secret (starts with `whsec_`)
+   - Copy this value to `.env` as `STRIPE_WEBHOOK_SECRET`
+
+#### Testing the Integration
+
+1. **Start your development server**:
+   ```bash
+   npm run dev
+   ```
+
+2. **Start the Stripe CLI webhook listener** (in a separate terminal):
+   ```bash
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   ```
+
+3. **Test with Stripe test cards**:
+   - Success: `4242 4242 4242 4242`
+   - Decline: `4000 0000 0000 0002`
+   - Use any future expiry date (e.g., `12/34`)
+   - Use any 3-digit CVC
+
+4. **Monitor webhook events**:
+   - Check your terminal for webhook logs
+   - Verify membership activation in your database
+
+#### Stripe Configuration Details
+
+- **SDK Version**: 20.0.0 (latest)
+- **API Version**: 2025-11-17.clover
+- **Currency**: EUR
+- **Membership Price**: €10.00 (1000 cents)
+- **Membership Duration**: 365 days (1 year)
 
 ### 5. Initialize Database
 

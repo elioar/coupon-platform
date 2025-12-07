@@ -14,7 +14,10 @@
     "filter": "Φίλτρο",
     "all": "Όλα",
     "close": "Κλείσιμο",
-    "coupons": "Κουπόνια"
+    "coupons": "Κουπόνια",
+    "view": "Προβολή",
+    "redirectingIn": "Ανακατεύθυνση σε",
+    "seconds": "δευτερόλεπτα"
   },
   "nav": {
     "home": "Αρχική",
@@ -255,7 +258,17 @@
     "unlimitedAccessToCodes": "Απεριόριστη πρόσβαση σε όλους τους κωδικούς κουπονιών",
     "exclusiveDeals": "Αποκλειστικές προσφορές από κορυφαίες μάρκες",
     "earlyAccess": "Πρώτη πρόσβαση σε νέα κουπόνια",
-    "prioritySupport": "Υποστήριξη πελατών προτεραιότητας"
+    "prioritySupport": "Υποστήριξη πελατών προτεραιότητας",
+    "congratulations": "Συγχαρητήρια!",
+    "youAreMember": "Είστε Premium Μέλος",
+    "enjoyBenefits": "Απολαύστε όλα τα αποκλειστικά προνόμια",
+    "membershipActive": "Η συνδρομή σας είναι ενεργή",
+    "viewCoupons": "Προβολή Όλων των Κουπονιών",
+    "renewEarly": "Ανανέωση Νωρίτερα",
+    "daysRemaining": "{days} ημέρες απομένουν",
+    "membershipDetails": "Στοιχεία Συνδρομής",
+    "startedOn": "Ξεκίνησε στις",
+    "validUntil": "Ισχύει μέχρι"
   },
   "coupons": {
     "title": "Διαθέσιμα Κουπόνια",
