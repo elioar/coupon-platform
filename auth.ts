@@ -40,6 +40,51 @@ const sanitizeBusinessDescription = (value: string | null) => {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Ensure the same secret is used across app, middleware, and API routes
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  // Allow operation behind proxies / on Vercel with custom domains
+  trustHost: true,
+  /**
+   * Explicit cookie domain so apex/www share the same session cookie.
+   * Set COOKIE_DOMAIN=".vibepeek.com" (including the leading dot) in prod.
+   */
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        domain: process.env.COOKIE_DOMAIN || undefined,
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    callbackUrl: {
+      name: "next-auth.callback-url",
+      options: {
+        domain: process.env.COOKIE_DOMAIN || undefined,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Host-next-auth.csrf-token"
+          : "next-auth.csrf-token",
+      options: {
+        domain: process.env.COOKIE_DOMAIN || undefined,
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   adapter: PrismaAdapter(prisma) as Adapter,
   session: {
     strategy: "jwt",
