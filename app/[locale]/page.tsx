@@ -73,6 +73,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
     totalCoupons: 0,
     activeMembers: 0,
     totalBusinesses: 0,
+    totalSavings: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -81,54 +82,41 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch categories
-        const categoriesRes = await fetch('/api/categories');
-        const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData.categories?.slice(0, 8) || []);
+        const [categoriesRes, couponsRes, statsRes] = await Promise.all([
+          fetch('/api/categories'),
+          fetch('/api/coupons?status=APPROVED&limit=6'),
+          fetch('/api/stats'),
+        ]);
 
-        // Fetch featured coupons (approved only)
-        const couponsRes = await fetch('/api/coupons?status=APPROVED&limit=6');
+        const categoriesData = await categoriesRes.json();
         const couponsData = await couponsRes.json();
+        const statsData = statsRes.ok ? await statsRes.json() : null;
+
         const coupons = couponsData.coupons || [];
+        setCategories(categoriesData.categories?.slice(0, 8) || []);
         setFeaturedCoupons(coupons);
 
-        // Fetch stats
-        try {
-          if (session?.user?.role === 'ADMIN') {
-            const statsRes = await fetch('/api/admin/stats');
-            if (statsRes.ok) {
-              const statsData = await statsRes.json();
-              setStats({
-                totalCoupons: statsData.totalCoupons || coupons.length,
-                activeMembers: statsData.activeMembers || 0,
-                totalBusinesses: statsData.totalBusinesses || 0,
-              });
-            } else {
-              // Fallback stats
-              setStats({
-                totalCoupons: coupons.length,
-                activeMembers: 0,
-                totalBusinesses: 0,
-              });
-            }
-          } else {
-            // For non-admins, use coupon count as estimate
-            setStats({
-              totalCoupons: coupons.length,
-              activeMembers: 0,
-              totalBusinesses: 0,
-            });
-          }
-        } catch (statsError) {
-          // If stats fail, use coupon count
-          setStats({
-            totalCoupons: coupons.length,
-            activeMembers: 0,
-            totalBusinesses: 0,
-          });
-        }
+        const receivedStats = statsData?.stats || null;
+        const totalCoupons = receivedStats?.totalCoupons ?? coupons.length;
+        const activeMembers = receivedStats?.activeMembers ?? 0;
+        const totalBusinesses = receivedStats?.totalBusinesses ?? 0;
+        const totalSavings =
+          receivedStats?.totalSavings ?? Math.max(0, totalCoupons * 10);
+
+        setStats({
+          totalCoupons,
+          activeMembers,
+          totalBusinesses,
+          totalSavings,
+        });
       } catch (error) {
-        // Error fetching data - silently fail
+        // If any call fails, fall back to safe defaults
+        setStats({
+          totalCoupons: 0,
+          activeMembers: 0,
+          totalBusinesses: 0,
+          totalSavings: 0,
+        });
       } finally {
         setLoading(false);
       }
@@ -746,7 +734,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
               <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">
-                €{stats.totalCoupons * 10}K+
+                €{stats.totalSavings}K+
               </div>
               <div className="mt-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                 {t('stats.savings')}

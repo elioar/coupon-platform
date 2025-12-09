@@ -183,3 +183,14 @@ model BusinessInvite {
   @@index([invitedBusinessId])
   @@index([status])
 }
+
+model SiteSettings {
+  id                 String   @id @default("default")
+  useRealStats       Boolean  @default(true)
+  fakeTotalCoupons   Int      @default(0)
+  fakeActiveMembers  Int      @default(0)
+  fakeTotalBusinesses Int     @default(0)
+  fakeTotalSavings   Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

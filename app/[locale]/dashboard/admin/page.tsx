@@ -51,6 +51,17 @@ interface Stats {
   activeMembers: number
 }
 
+interface SiteSettings {
+  id: string
+  useRealStats: boolean
+  fakeTotalCoupons: number
+  fakeActiveMembers: number
+  fakeTotalBusinesses: number
+  fakeTotalSavings: number
+}
+
+type SettingsNumberField = "fakeTotalCoupons" | "fakeActiveMembers" | "fakeTotalBusinesses" | "fakeTotalSavings"
+
 interface Category {
   id: string
   nameEn: string
@@ -125,6 +136,16 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [settings, setSettings] = useState<SiteSettings | null>(null)
+  const [settingsForm, setSettingsForm] = useState({
+    useRealStats: true,
+    fakeTotalCoupons: 0,
+    fakeActiveMembers: 0,
+    fakeTotalBusinesses: 0,
+    fakeTotalSavings: 0,
+  })
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingCoupons, setLoadingCoupons] = useState(false)
   const [activeTab, setActiveTab] = useState<"coupons" | "users" | "categories">("coupons")
@@ -183,22 +204,34 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [couponsRes, usersRes, statsRes, categoriesRes] = await Promise.all([
+        const [couponsRes, usersRes, statsRes, categoriesRes, settingsRes] = await Promise.all([
           fetch('/api/admin/coupons/pending'),
           fetch('/api/admin/users'),
           fetch('/api/admin/stats'),
           fetch('/api/categories'),
+          fetch('/api/admin/settings'),
         ])
 
         const couponsData = await couponsRes.json()
         const usersData = await usersRes.json()
         const statsData = await statsRes.json()
         const categoriesData = await categoriesRes.json()
+        const settingsData = settingsRes.ok ? await settingsRes.json() : null
 
         setPendingCoupons(couponsData.coupons || [])
         setUsers(usersData.users || [])
         setStats(statsData.stats || null)
         setCategories(categoriesData.categories || [])
+        if (settingsData?.settings) {
+          setSettings(settingsData.settings)
+          setSettingsForm({
+            useRealStats: settingsData.settings.useRealStats ?? true,
+            fakeTotalCoupons: settingsData.settings.fakeTotalCoupons ?? 0,
+            fakeActiveMembers: settingsData.settings.fakeActiveMembers ?? 0,
+            fakeTotalBusinesses: settingsData.settings.fakeTotalBusinesses ?? 0,
+            fakeTotalSavings: settingsData.settings.fakeTotalSavings ?? 0,
+          })
+        }
       } catch (error) {
         // Error fetching data - handled silently
       } finally {
@@ -242,6 +275,54 @@ export default function AdminDashboard() {
         setMessage({ type: 'error', text: 'Failed to load coupons' })
     } finally {
       setLoadingCoupons(false)
+    }
+  }
+
+  const handleSettingsNumberChange = (field: SettingsNumberField, value: number) => {
+    const safeValue = Number.isFinite(value) ? value : 0
+    setSettingsForm((prev) => ({
+      ...prev,
+      [field]: Math.max(0, Math.round(safeValue)),
+    }))
+  }
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true)
+    setSettingsMessage(null)
+
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settingsForm),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update settings')
+      }
+
+      if (data.settings) {
+        setSettings(data.settings)
+        setSettingsForm({
+          useRealStats: data.settings.useRealStats ?? true,
+          fakeTotalCoupons: data.settings.fakeTotalCoupons ?? 0,
+          fakeActiveMembers: data.settings.fakeActiveMembers ?? 0,
+          fakeTotalBusinesses: data.settings.fakeTotalBusinesses ?? 0,
+          fakeTotalSavings: data.settings.fakeTotalSavings ?? 0,
+        })
+      }
+
+      setSettingsMessage({ type: 'success', text: 'Settings updated successfully' })
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'Failed to update settings'
+      setSettingsMessage({ type: 'error', text: messageText })
+    } finally {
+      setSavingSettings(false)
+      setTimeout(() => setSettingsMessage(null), 5000)
     }
   }
 
@@ -1446,6 +1527,139 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+              {/* Home Page Stats Control */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Home page stats</h3>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Choose whether the public home page shows real platform numbers or custom values.
+                    </p>
+                  </div>
+                  <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${
+                    settingsForm.useRealStats
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  }`}>
+                    {settingsForm.useRealStats ? 'Real data' : 'Custom data'}
+                  </span>
+                </div>
+
+                {settingsMessage && (
+                  <div className={`mt-4 rounded-lg border p-3 text-sm ${
+                    settingsMessage.type === 'success'
+                      ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-300'
+                      : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300'
+                  }`}>
+                    {settingsMessage.text}
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Use real platform data</p>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400">Live counts from approved coupons, active members, and businesses.</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={settingsForm.useRealStats}
+                      disabled={savingSettings}
+                      onClick={() => setSettingsForm((prev) => ({ ...prev, useRealStats: !prev.useRealStats }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                        settingsForm.useRealStats ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                      } ${savingSettings ? 'cursor-not-allowed opacity-60' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                          settingsForm.useRealStats ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Custom total coupons</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settingsForm.fakeTotalCoupons}
+                      onChange={(e) => handleSettingsNumberChange("fakeTotalCoupons", Number(e.target.value))}
+                      disabled={savingSettings}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+                    />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Shown as coupons on the home page.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Custom active members</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settingsForm.fakeActiveMembers}
+                      onChange={(e) => handleSettingsNumberChange("fakeActiveMembers", Number(e.target.value))}
+                      disabled={savingSettings}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+                    />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Use this when sharing projected growth numbers.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Custom businesses</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settingsForm.fakeTotalBusinesses}
+                      onChange={(e) => handleSettingsNumberChange("fakeTotalBusinesses", Number(e.target.value))}
+                      disabled={savingSettings}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+                    />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Displayed as partnered businesses.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Custom savings (K€)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settingsForm.fakeTotalSavings}
+                      onChange={(e) => handleSettingsNumberChange("fakeTotalSavings", Number(e.target.value))}
+                      disabled={savingSettings}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+                    />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Shown as €XK+ in the savings card.</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (settings) {
+                        setSettingsForm({
+                          useRealStats: settings.useRealStats ?? true,
+                          fakeTotalCoupons: settings.fakeTotalCoupons ?? 0,
+                          fakeActiveMembers: settings.fakeActiveMembers ?? 0,
+                          fakeTotalBusinesses: settings.fakeTotalBusinesses ?? 0,
+                          fakeTotalSavings: settings.fakeTotalSavings ?? 0,
+                        })
+                      }
+                    }}
+                    disabled={savingSettings || !settings}
+                    className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    Reset to saved
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingSettings ? 'Saving...' : 'Save settings'}
+                  </button>
+                </div>
+              </div>
+
               {/* Advanced Settings */}
               <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Advanced Settings</h3>
@@ -1511,8 +1725,8 @@ export default function AdminDashboard() {
               <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 lg:mb-8">
                 {/* Total Coupons */}
                 <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-                  <div className="absolute right-3 top-3 rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30 sm:right-4 sm:top-4">
-                    <svg className="h-4 w-4 text-violet-600 dark:text-violet-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="absolute right-3 top-3 rounded-lg bg-green-100 p-2 dark:bg-green-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-green-600 dark:text-green-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
@@ -1584,8 +1798,8 @@ export default function AdminDashboard() {
 
                 {/* Total Businesses */}
                 <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-                  <div className="absolute right-3 top-3 rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30 sm:right-4 sm:top-4">
-                    <svg className="h-4 w-4 text-purple-600 dark:text-purple-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="absolute right-3 top-3 rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30 sm:right-4 sm:top-4">
+                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400 sm:h-5 sm:w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                       <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
@@ -1627,7 +1841,7 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab("coupons")}
                   className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "coupons"
-                      ? "bg-violet-600 text-white shadow-sm"
+                      ? "bg-green-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -1648,7 +1862,7 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab("users")}
                   className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "users"
-                      ? "bg-violet-600 text-white shadow-sm"
+                      ? "bg-green-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -1664,7 +1878,7 @@ export default function AdminDashboard() {
                   onClick={() => setActiveTab("categories")}
                   className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm ${
                     activeTab === "categories"
-                      ? "bg-violet-600 text-white shadow-sm"
+                      ? "bg-green-600 text-white shadow-sm"
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -1699,80 +1913,118 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       {pendingCoupons.map((coupon) => (
                         <div
                           key={coupon.id}
-                          className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 transition hover:border-violet-200 hover:bg-violet-50/50 dark:border-zinc-800 dark:bg-zinc-800/50 dark:hover:border-violet-800 dark:hover:bg-violet-900/10"
+                          className="group flex h-[480px] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="mb-3 flex items-start justify-between">
-                                <div>
-                                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                                    {coupon.title}
-                                  </h3>
-                                  {coupon.business && (
-                                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                                      By <strong>{coupon.business.name}</strong> ({coupon.business.email})
-                                    </p>
-                                  )}
-                                </div>
-                                <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">
-                                  {coupon.discountPercentage}% OFF
+                          {/* Header with badges - fixed height */}
+                          <div className="flex h-20 flex-shrink-0 items-start justify-between border-b border-zinc-100 p-5 dark:border-zinc-800">
+                            <div className="flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-600" />
+                                Pending
+                              </span>
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                {coupon.discountPercentage}% OFF
+                              </span>
+                            </div>
+                            {coupon.imagePath && (
+                              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                <img 
+                                  src={coupon.imagePath} 
+                                  alt={coupon.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Content - scrollable area */}
+                          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                            <div>
+                              <h3 className="text-lg font-bold leading-tight text-zinc-900 dark:text-zinc-50">
+                                {coupon.title}
+                              </h3>
+                              {coupon.business && (
+                                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                  by <span className="font-semibold text-zinc-900 dark:text-zinc-100">{coupon.business.name}</span>
+                                </p>
+                              )}
+                              {coupon.category?.nameEn && (
+                                <p className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                                  {coupon.category.nameEn}
+                                </p>
+                              )}
+                            </div>
+
+                            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                              {coupon.description}
+                            </p>
+
+                            {/* Info grid */}
+                            <div className="space-y-2 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/50">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-zinc-500 dark:text-zinc-400">Code</span>
+                                <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-100">
+                                  {coupon.code || "—"}
                                 </span>
                               </div>
-                              
-                              <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                {coupon.description}
-                              </p>
-                              
-                              <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                  </svg>
-                                  <strong>{coupon.code || "N/A"}</strong>
-                                </span>
-                                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  Expires: {new Date(coupon.expirationDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-zinc-500 dark:text-zinc-400">Type</span>
+                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                  {coupon.couponType === "QR_CODE" ? "QR Code" : "Online"}
                                 </span>
                               </div>
-                              
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleApproval(coupon.id, "APPROVED")}
-                                  disabled={processingCoupon === coupon.id}
-                                >
-                                  {processingCoupon === coupon.id ? tCommon("loading") : (
-                                    <div className="flex items-center gap-1">
-                                      <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path d="M5 13l4 4L19 7" />
-                                      </svg>
-                                      {t("approve")}
-                                    </div>
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  onClick={() => handleApproval(coupon.id, "REJECTED")}
-                                  disabled={processingCoupon === coupon.id}
-                                >
-                                  {processingCoupon === coupon.id ? tCommon("loading") : (
-                                    <div className="flex items-center gap-1">
-                                      <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                      {t("reject")}
-                                    </div>
-                                  )}
-                                </Button>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-zinc-500 dark:text-zinc-400">Expires</span>
+                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                  {new Date(coupon.expirationDate).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </span>
                               </div>
+                            </div>
+                          </div>
+
+                          {/* Action buttons - fixed at bottom, always visible */}
+                          <div className="flex-shrink-0 border-t border-zinc-100 p-4 dark:border-zinc-800">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleApproval(coupon.id, "APPROVED")}
+                                disabled={processingCoupon === coupon.id}
+                                className="group/btn flex-1 rounded-xl bg-green-600 py-2.5 font-semibold text-white shadow-sm transition-all hover:bg-green-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {processingCoupon === coupon.id ? (
+                                  <span className="text-sm">{tCommon("loading")}</span>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <svg className="h-4 w-4 transition-transform group-hover/btn:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span className="text-sm">{t("approve")}</span>
+                                  </div>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleApproval(coupon.id, "REJECTED")}
+                                disabled={processingCoupon === coupon.id}
+                                className="group/btn flex-1 rounded-xl border-2 border-red-200 bg-white py-2.5 font-semibold text-red-600 transition-all hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-zinc-900 dark:text-red-400 dark:hover:border-red-800 dark:hover:bg-red-950/30"
+                              >
+                                {processingCoupon === coupon.id ? (
+                                  <span className="text-sm">{tCommon("loading")}</span>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <svg className="h-4 w-4 transition-transform group-hover/btn:scale-110" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    <span className="text-sm">{t("reject")}</span>
+                                  </div>
+                                )}
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1810,7 +2062,7 @@ export default function AdminDashboard() {
                         <tr key={user.id} className="transition hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700 dark:bg-green-900/30 dark:text-green-300">
                                 {user.name.charAt(0).toUpperCase()}
                               </div>
                               <span className="font-medium text-zinc-900 dark:text-zinc-100">
