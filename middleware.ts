@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
   const pathWithoutLocale = pathname.replace(`/${pathnameLocale}`, '') || '/';
 
   // Public paths that don't require authentication
-  const publicPaths = ["/", "/login", "/register", "/coupons", "/membership"];
+  const publicPaths = ["/", "/login", "/register", "/coupons", "/membership", "/community"];
   const isPublicPath = publicPaths.includes(pathWithoutLocale);
 
   // Get token (lighter than full auth() - doesn't import Prisma)

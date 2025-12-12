@@ -49,6 +49,12 @@ enum DiscountType {
   BOGO_2_1
 }
 
+enum CommunityDealStatus {
+  ACTIVE
+  EXPIRED
+  REPORTED
+}
+
 model User {
   id                  String    @id @default(cuid())
   email               String    @unique
@@ -77,6 +83,9 @@ model User {
   couponRedemptions CouponRedemption[]
   sentInvites       BusinessInvite[]   @relation("InviterInvites")
   receivedInvites   BusinessInvite[]   @relation("InvitedBusiness")
+  communityDeals    CommunityDeal[]
+  communityDealComments CommunityDealComment[]
+  communityDealVotes    CommunityDealVote[]
 
   @@index([email])
   @@index([role])
@@ -193,4 +202,63 @@ model SiteSettings {
   fakeTotalSavings   Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model CommunityDeal {
+  id          String              @id @default(cuid())
+  title       String
+  description String              @db.Text
+  category    String
+  location    String
+  latitude    Float?
+  longitude   Float?
+  imageUrl    String
+  couponCode  String?
+  userId      String
+  createdAt   DateTime            @default(now())
+  expiresAt   DateTime
+  status      CommunityDealStatus @default(ACTIVE)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments CommunityDealComment[]
+  votes    CommunityDealVote[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([category])
+  @@index([latitude, longitude])
+}
+
+model CommunityDealComment {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    String
+  text      String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  deal CommunityDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model CommunityDealVote {
+  id        String   @id @default(cuid())
+  dealId    String
+  userId    String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal CommunityDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, userId])
+  @@index([dealId])
+  @@index([userId])
+  @@index([value])
 }
