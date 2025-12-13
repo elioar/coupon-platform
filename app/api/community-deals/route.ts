@@ -9,8 +9,8 @@ const createCommunityDealSchema = z.object({
   description: z.string().min(10),
   category: z.string().min(1),
   location: z.string().min(1),
-  latitude: z.number().optional().nullable(),
-  longitude: z.number().optional().nullable(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
   imageUrl: z.string().url(),
   couponCode: z.string().optional(),
   expiresAt: z.string().datetime(),
@@ -136,14 +136,8 @@ export async function POST(request: NextRequest) {
         description: validatedData.description,
         category: validatedData.category,
         location: validatedData.location,
-        latitude:
-          typeof validatedData.latitude === "number" && !Number.isNaN(validatedData.latitude)
-            ? validatedData.latitude
-            : null,
-        longitude:
-          typeof validatedData.longitude === "number" && !Number.isNaN(validatedData.longitude)
-            ? validatedData.longitude
-            : null,
+        latitude: validatedData.latitude,
+        longitude: validatedData.longitude,
         imageUrl: validatedData.imageUrl,
         couponCode: validatedData.couponCode || null,
         expiresAt: expiresAt,

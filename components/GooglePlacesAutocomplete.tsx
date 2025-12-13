@@ -6,6 +6,7 @@ interface GooglePlacesAutocompleteProps {
   value: string
   onChange: (value: string) => void
   onCoordinatesChange?: (lat: number, lng: number) => void
+  onPlaceSelected?: (payload: { address: string; lat: number; lng: number }) => void
   placeholder?: string
   className?: string
   id?: string
@@ -114,6 +115,7 @@ export default function GooglePlacesAutocomplete({
   value,
   onChange,
   onCoordinatesChange,
+  onPlaceSelected,
   placeholder = "Enter location...",
   className = "",
   id,
@@ -122,6 +124,9 @@ export default function GooglePlacesAutocomplete({
 }: GooglePlacesAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<any>(null)
+  const placeAutocompleteElementRef = useRef<any>(null)
+  const suppressNextInputEventRef = useRef(false)
+  const placeSelectedRef = useRef(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [apiError, setApiError] = useState<string | null>(null)
@@ -171,7 +176,7 @@ export default function GooglePlacesAutocomplete({
     // Only try to initialize autocomplete if API is loaded
     if (!isLoaded || !inputRef.current) return
 
-    // Initialize Autocomplete
+    // Prefer PlaceAutocompleteElement (recommended by Google) when available.
     try {
       // Check if Places API is available
       if (!window.google?.maps?.places) {
@@ -179,9 +184,120 @@ export default function GooglePlacesAutocomplete({
         return
       }
 
+      const placesAny = window.google.maps.places as any
+
+      // Attempt to use the new PlaceAutocompleteElement on the existing input.
+      // This keeps our Tailwind-styled input while avoiding the legacy Autocomplete warning.
+      if (placesAny.PlaceAutocompleteElement) {
+        try {
+          const el = new placesAny.PlaceAutocompleteElement()
+          placeAutocompleteElementRef.current = el
+
+          // Some implementations allow binding to an existing input via inputElement.
+          if ("inputElement" in el) {
+            ;(el as any).inputElement = inputRef.current
+          }
+
+          // Sync placeholder if supported
+          if ("placeholder" in el) {
+            ;(el as any).placeholder = placeholder
+          }
+
+          // Listen for selection events (API uses gmp-placeselect)
+          const handler = async (event: any) => {
+            const place = event?.place ?? event?.detail?.place ?? (el as any).place
+            if (!place) return
+
+            try {
+              if (typeof place.fetchFields === "function") {
+                await place.fetchFields({
+                  fields: ["formattedAddress", "location", "displayName", "name"],
+                })
+              }
+            } catch {
+              // ignore field fetch failures
+            }
+
+            const address =
+              place.formattedAddress ||
+              place.formatted_address ||
+              place.displayName ||
+              place.name ||
+              ""
+
+            const loc =
+              place.location ||
+              place.geometry?.location ||
+              null
+
+            const lat =
+              loc && typeof loc.lat === "function" ? loc.lat() : loc?.lat
+            const lng =
+              loc && typeof loc.lng === "function" ? loc.lng() : loc?.lng
+
+            if (address) {
+              // Prevent the underlying input from emitting a subsequent onChange that would
+              // be treated as "manual typing" by parent code (which can clear coordinates).
+              suppressNextInputEventRef.current = true
+              placeSelectedRef.current = true
+              console.log("[GooglePlacesAutocomplete] Place selected:", { address, lat, lng })
+              if (
+                typeof lat === "number" &&
+                typeof lng === "number" &&
+                !isNaN(lat) &&
+                !isNaN(lng) &&
+                typeof onPlaceSelected === "function"
+              ) {
+                console.log("[GooglePlacesAutocomplete] Calling onPlaceSelected with:", { address, lat, lng })
+                onPlaceSelected({ address, lat, lng })
+              } else {
+                console.log("[GooglePlacesAutocomplete] No valid coords, calling onChange")
+                onChange(address)
+              }
+              if (inputRef.current && inputRef.current.value !== address) {
+                inputRef.current.value = address
+              }
+              // Reset after a short delay to allow onChange to process
+              setTimeout(() => {
+                placeSelectedRef.current = false
+              }, 100)
+            }
+
+            if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+              if (onCoordinatesChange) onCoordinatesChange(lat, lng)
+            }
+          }
+
+          // Register listener
+          if (typeof el.addEventListener === "function") {
+            el.addEventListener("gmp-placeselect", handler)
+            ;(el as any).__vpHandler = handler
+          }
+
+          // If we got here, we successfully set up the new element. Clear any previous errors and skip legacy.
+          setApiError(null)
+          return () => {
+            try {
+              const cleanupHandler = (el as any).__vpHandler
+              if (cleanupHandler && typeof el.removeEventListener === "function") {
+                el.removeEventListener("gmp-placeselect", cleanupHandler)
+              }
+            } catch {
+              // ignore cleanup errors
+            }
+            placeAutocompleteElementRef.current = null
+          }
+        } catch {
+          // Fall back to legacy below
+          placeAutocompleteElementRef.current = null
+        }
+      }
+
+      // Fallback: legacy Autocomplete
       // Configure autocomplete with better search options
       // Note: "establishment" cannot be mixed with "geocode" or "address"
       // Using "geocode" which includes both addresses and establishments
+      console.log("[GooglePlacesAutocomplete] Initializing legacy Autocomplete")
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -201,23 +317,52 @@ export default function GooglePlacesAutocomplete({
           // componentRestrictions: { country: ["gr", "us"] }, // Uncomment and add countries if needed
         }
       )
+      console.log("[GooglePlacesAutocomplete] Legacy Autocomplete initialized:", autocompleteRef.current)
 
       // Listen for place selection
       autocompleteRef.current.addListener("place_changed", () => {
+        console.log("[GooglePlacesAutocomplete] place_changed event fired!")
         const place = autocompleteRef.current.getPlace()
+        console.log("[GooglePlacesAutocomplete] place object:", place)
         
         if (place) {
           // Prefer formatted_address, but fallback to name if address not available
           const address = place.formatted_address || place.name || ""
           
           if (address) {
-            // Update React state immediately
-            onChange(address)
+            // Mark that a place was selected to prevent onChange from clearing coordinates
+            suppressNextInputEventRef.current = true
+            placeSelectedRef.current = true
+            
+            const loc = place.geometry?.location || null
+            const lat = loc ? (typeof loc.lat === "function" ? loc.lat() : loc.lat) : null
+            const lng = loc ? (typeof loc.lng === "function" ? loc.lng() : loc.lng) : null
+
+            console.log("[GooglePlacesAutocomplete] place_changed - extracted:", { address, lat, lng })
+
+            if (
+              typeof lat === "number" &&
+              typeof lng === "number" &&
+              !isNaN(lat) &&
+              !isNaN(lng) &&
+              typeof onPlaceSelected === "function"
+            ) {
+              console.log("[GooglePlacesAutocomplete] Calling onPlaceSelected from place_changed")
+              onPlaceSelected({ address, lat, lng })
+            } else {
+              console.log("[GooglePlacesAutocomplete] No valid coords in place_changed, calling onChange")
+              onChange(address)
+            }
             
             // Also ensure the input value is set correctly (Google Places might have set it already)
             if (inputRef.current && inputRef.current.value !== address) {
               inputRef.current.value = address
             }
+            
+            // Reset after a short delay to allow onChange to process
+            setTimeout(() => {
+              placeSelectedRef.current = false
+            }, 100)
           }
 
           // Extract and pass coordinates if available
@@ -235,6 +380,7 @@ export default function GooglePlacesAutocomplete({
           }
         }
       })
+      console.log("[GooglePlacesAutocomplete] place_changed listener attached")
 
       // Clear any previous errors on success
       setApiError(null)
@@ -245,6 +391,18 @@ export default function GooglePlacesAutocomplete({
 
     // Cleanup
     return () => {
+      if (placeAutocompleteElementRef.current) {
+        try {
+          const el = placeAutocompleteElementRef.current
+          const cleanupHandler = (el as any).__vpHandler
+          if (cleanupHandler && typeof el.removeEventListener === "function") {
+            el.removeEventListener("gmp-placeselect", cleanupHandler)
+          }
+        } catch {
+          // ignore cleanup errors
+        }
+        placeAutocompleteElementRef.current = null
+      }
       if (autocompleteRef.current) {
         try {
           if (window.google?.maps?.event) {
@@ -256,7 +414,7 @@ export default function GooglePlacesAutocomplete({
         autocompleteRef.current = null
       }
     }
-  }, [isLoaded, onChange])
+  }, [isLoaded, onChange, onCoordinatesChange, onPlaceSelected, placeholder])
 
   return (
     <div className="relative">
@@ -268,10 +426,48 @@ export default function GooglePlacesAutocomplete({
         name={name}
         value={value}
         onChange={(e) => {
+          if (suppressNextInputEventRef.current) {
+            console.log("[GooglePlacesAutocomplete] onChange suppressed (after selection)")
+            suppressNextInputEventRef.current = false
+            return
+          }
+          console.log("[GooglePlacesAutocomplete] onChange called with:", e.target.value)
+          // If a place was just selected, don't clear coordinates
+          if (placeSelectedRef.current) {
+            console.log("[GooglePlacesAutocomplete] onChange: place was selected, not clearing coords")
+            onChange(e.target.value)
+            return
+          }
           // Update state immediately when user types
           onChange(e.target.value)
         }}
         onBlur={(e) => {
+          if (suppressNextInputEventRef.current) {
+            suppressNextInputEventRef.current = false
+            return
+          }
+          
+          // Check if a place was selected when user clicks away
+          if (autocompleteRef.current && typeof onPlaceSelected === "function") {
+            const place = autocompleteRef.current.getPlace()
+            if (place && place.geometry?.location) {
+              const address = place.formatted_address || place.name || e.target.value
+              const loc = place.geometry.location
+              const lat = typeof loc.lat === "function" ? loc.lat() : loc.lat
+              const lng = typeof loc.lng === "function" ? loc.lng() : loc.lng
+              
+              if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+                console.log("[GooglePlacesAutocomplete] onBlur: place found, calling onPlaceSelected")
+                placeSelectedRef.current = true
+                onPlaceSelected({ address, lat, lng })
+                setTimeout(() => {
+                  placeSelectedRef.current = false
+                }, 100)
+                return
+              }
+            }
+          }
+          
           // Ensure value is synced on blur (when user clicks away)
           if (e.target.value !== value) {
             onChange(e.target.value)

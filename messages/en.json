@@ -388,6 +388,7 @@
       "descriptionMin": "Description must be at least 10 characters",
       "categoryRequired": "Please select a category",
       "locationRequired": "Location is required",
+      "locationGoogleRequired": "Please choose a location from the Google suggestions",
       "imageRequired": "Please upload an image",
       "expiresAtRequired": "Expiration date is required",
       "expiresAtFuture": "Expiration date must be in the future"

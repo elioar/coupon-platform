@@ -47,6 +47,11 @@ const formatDate = (dateString: string, locale: string) => {
   }).format(date)
 }
 
+const formatLocation = (location: string) => {
+  const words = location.trim().split(/\s+/)
+  return words.slice(0, 2).join(" ")
+}
+
 export default function CommunityDealCard({
   deal,
   locale,
@@ -149,7 +154,7 @@ export default function CommunityDealCard({
             <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <span className="truncate">
-            {deal.location}
+            {formatLocation(deal.location)}
             {distanceLabel ? (
               <span className="ml-2 text-xs font-semibold text-zinc-500 dark:text-zinc-500">
                 • {distanceLabel}

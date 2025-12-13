@@ -218,6 +218,7 @@ model CommunityDeal {
   createdAt   DateTime            @default(now())
   expiresAt   DateTime
   status      CommunityDealStatus @default(ACTIVE)
+  seedGroupId String?             // Track which seed batch this deal belongs to
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -229,6 +230,7 @@ model CommunityDeal {
   @@index([expiresAt])
   @@index([category])
   @@index([latitude, longitude])
+  @@index([seedGroupId])
 }
 
 model CommunityDealComment {

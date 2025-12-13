@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
-import { useParams } from "next/navigation"
-import { motion } from "framer-motion"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import Navigation from "@/components/Navigation"
 import CommunityDealCard from "@/components/CommunityDealCard"
+import SkeletonCommunityDealCard from "@/components/SkeletonCommunityDealCard"
 import CreateDealModal from "@/components/CreateDealModal"
 import CommunityDealModal from "@/components/CommunityDealModal"
 
@@ -39,6 +40,15 @@ export default function CommunityPage() {
   const tCommon = useTranslations("common")
   const params = useParams()
   const locale = params.locale as string
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const getInitialPage = () => {
+    const pageParam = searchParams.get("page")
+    const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
+    return Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+  }
 
   const [deals, setDeals] = useState<CommunityDeal[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +56,7 @@ export default function CommunityPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<CommunityDeal | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(getInitialPage)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [nearMeEnabled, setNearMeEnabled] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -53,6 +64,7 @@ export default function CommunityPage() {
   const [geolocationSupported, setGeolocationSupported] = useState(false)
   const [locationDescription, setLocationDescription] = useState<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
+  const itemsPerPage = 9
 
   const categories = [
     "Food & Dining",
@@ -71,6 +83,57 @@ export default function CommunityPage() {
       setGeolocationSupported(true)
     }
   }, [])
+
+  const updateUrlParams = (updates: { category?: string | null; q?: string; page?: number }) => {
+    const paramsCopy = new URLSearchParams(searchParams.toString())
+
+    if ("category" in updates) {
+      const categoryValue = updates.category
+      if (categoryValue) {
+        paramsCopy.set("category", categoryValue)
+      } else {
+        paramsCopy.delete("category")
+      }
+    }
+
+    if ("q" in updates) {
+      const queryValue = updates.q ?? ""
+      if (queryValue.length > 0) {
+        paramsCopy.set("q", queryValue)
+      } else {
+        paramsCopy.delete("q")
+      }
+    }
+
+    if ("page" in updates) {
+      const pageValue = updates.page ?? 1
+      if (pageValue > 1) {
+        paramsCopy.set("page", pageValue.toString())
+      } else {
+        paramsCopy.delete("page")
+      }
+    }
+
+    const queryString = paramsCopy.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    updateUrlParams({ page })
+  }
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category")
+    const queryParam = searchParams.get("q") ?? ""
+    const pageParam = searchParams.get("page")
+    const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
+    const normalizedPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+
+    setSelectedCategory(categoryParam ?? null)
+    setSearchQuery(queryParam)
+    setCurrentPage(normalizedPage)
+  }, [searchParams])
 
   const calculateDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const toRad = (value: number) => (value * Math.PI) / 180
@@ -389,6 +452,16 @@ export default function CommunityPage() {
         })()
       : dealsWithDistance
 
+  const totalPages = Math.ceil(sortedDeals.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedDeals = sortedDeals.slice(startIndex, endIndex)
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [currentPage])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-green-50/30 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
       <Navigation />
@@ -537,9 +610,15 @@ export default function CommunityPage() {
 
         {/* Loading State */}
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-zinc-600 dark:text-zinc-400">{tCommon("loading")}</div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {Array.from({ length: 9 }).map((_, index) => (
+              <SkeletonCommunityDealCard key={index} />
+            ))}
+          </motion.div>
         )}
 
         {/* Deals Grid */}
@@ -550,18 +629,135 @@ export default function CommunityPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             {sortedDeals.length > 0 ? (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {sortedDeals.map((deal) => (
-                  <CommunityDealCard
-                    key={deal.id}
-                    deal={deal}
-                    locale={locale}
-                    onViewClick={() => handleViewDeal(deal)}
-                    canInteract={!!session}
-                    onVote={handleVote}
-                  />
-                ))}
-              </div>
+              <>
+                <motion.div
+                  key={`deals-page-${currentPage}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ 
+                    opacity: 1,
+                    transition: { duration: 0.2 }
+                  }}
+                  exit={{ opacity: 0 }}
+                  className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {paginatedDeals.map((deal, index) => (
+                      <motion.div
+                        key={deal.id}
+                        layout
+                        initial={{ opacity: 0, y: 15, scale: 0.97 }}
+                        animate={{ 
+                          opacity: 1, 
+                          y: 0, 
+                          scale: 1,
+                          transition: {
+                            type: "spring",
+                            stiffness: 120,
+                            damping: 22,
+                            delay: Math.min(index * 0.04, 0.25),
+                          },
+                        }}
+                        exit={{ 
+                          opacity: 0, 
+                          scale: 0.92, 
+                          y: -10,
+                          transition: {
+                            duration: 0.15,
+                          },
+                        }}
+                        whileHover={{
+                          y: -8,
+                          transition: {
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 17,
+                          },
+                        }}
+                        whileTap={{
+                          scale: 0.98,
+                        }}
+                      >
+                        <CommunityDealCard
+                          deal={deal}
+                          locale={locale}
+                          onViewClick={() => handleViewDeal(deal)}
+                          canInteract={!!session}
+                          onVote={handleVote}
+                          userLocation={userLocation}
+                          nearMeEnabled={nearMeEnabled}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-12 flex flex-wrap items-center justify-center gap-2"
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all hover:bg-zinc-50 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </motion.button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                        let pageNum: number
+                        if (totalPages <= 7) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 4) {
+                          pageNum = i + 1
+                        } else if (currentPage >= totalPages - 3) {
+                          pageNum = totalPages - 6 + i
+                        } else {
+                          pageNum = currentPage - 3 + i
+                        }
+
+                        const isActive = currentPage === pageNum
+
+                        return (
+                          <motion.button
+                            key={pageNum}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`h-10 w-10 rounded-lg border font-semibold transition-all ${
+                              isActive
+                                ? "border-green-600 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg"
+                                : "border-zinc-200 bg-white text-zinc-700 shadow-md hover:bg-zinc-50 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            {pageNum}
+                          </motion.button>
+                        )
+                      })}
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-md transition-all hover:bg-zinc-50 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </motion.button>
+                  </motion.div>
+                )}
+              </>
             ) : (
               <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
                 <svg

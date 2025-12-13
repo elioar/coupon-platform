@@ -146,6 +146,11 @@ export default function AdminDashboard() {
   })
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [seedingDeals, setSeedingDeals] = useState(false)
+  const [seedingMessage, setSeedingMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [seedGroups, setSeedGroups] = useState<Array<{ seedGroupId: string; dealCount: number; createdAt: string }>>([])
+  const [loadingSeedGroups, setLoadingSeedGroups] = useState(false)
+  const [deletingGroup, setDeletingGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingCoupons, setLoadingCoupons] = useState(false)
   const [activeTab, setActiveTab] = useState<"coupons" | "users" | "categories">("coupons")
@@ -201,6 +206,27 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
+  // Community deals state
+  const [communityDeals, setCommunityDeals] = useState<any[]>([])
+  const [loadingCommunityDeals, setLoadingCommunityDeals] = useState(false)
+  const [editingDealId, setEditingDealId] = useState<string | null>(null)
+  const [deletingDealId, setDeletingDealId] = useState<string | null>(null)
+  const [dealForm, setDealForm] = useState({
+    title: "",
+    description: "",
+    category: "",
+    location: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+    couponCode: "",
+    expiresAt: "",
+    status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "REPORTED",
+  })
+  const [submittingDeal, setSubmittingDeal] = useState(false)
+  const [dealSearchQuery, setDealSearchQuery] = useState("")
+  const [dealStatusFilter, setDealStatusFilter] = useState<"ALL" | "ACTIVE" | "EXPIRED" | "REPORTED">("ALL")
+  const [dealCategoryFilter, setDealCategoryFilter] = useState<string>("ALL")
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -248,6 +274,119 @@ export default function AdminDashboard() {
       fetchAllCoupons()
     }
   }, [section])
+
+  // Fetch seed groups when settings section is active
+  useEffect(() => {
+    if (section === "settings") {
+      fetchSeedGroups()
+    }
+  }, [section])
+
+  // Fetch community deals when community-deals section is active
+  useEffect(() => {
+    if (section === "community-deals") {
+      fetchCommunityDeals()
+    }
+  }, [section])
+
+  const fetchCommunityDeals = async () => {
+    setLoadingCommunityDeals(true)
+    try {
+      const params = new URLSearchParams()
+      if (dealStatusFilter !== "ALL") {
+        params.append("status", dealStatusFilter)
+      }
+      if (dealCategoryFilter !== "ALL") {
+        params.append("category", dealCategoryFilter)
+      }
+      if (dealSearchQuery) {
+        params.append("search", dealSearchQuery)
+      }
+
+      const response = await fetch(`/api/admin/community-deals?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch community deals")
+      }
+      const data = await response.json()
+      setCommunityDeals(data.deals || [])
+    } catch (error) {
+      console.error("Error fetching community deals:", error)
+      setMessage({ type: "error", text: "Failed to load community deals" })
+    } finally {
+      setLoadingCommunityDeals(false)
+    }
+  }
+
+  const handleEditDeal = async (deal: any) => {
+    setEditingDealId(deal.id)
+    setDealForm({
+      title: deal.title,
+      description: deal.description,
+      category: deal.category,
+      location: deal.location,
+      latitude: deal.latitude,
+      longitude: deal.longitude,
+      couponCode: deal.couponCode || "",
+      expiresAt: deal.expiresAt ? new Date(deal.expiresAt).toISOString().split("T")[0] : "",
+      status: deal.status,
+    })
+  }
+
+  const handleSaveDeal = async () => {
+    if (!editingDealId) return
+
+    setSubmittingDeal(true)
+    try {
+      const response = await fetch(`/api/admin/community-deals/${editingDealId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...dealForm,
+          expiresAt: dealForm.expiresAt ? new Date(dealForm.expiresAt).toISOString() : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to update deal")
+      }
+
+      setMessage({ type: "success", text: "Deal updated successfully" })
+      setEditingDealId(null)
+      fetchCommunityDeals()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update deal"
+      setMessage({ type: "error", text: errorMessage })
+    } finally {
+      setSubmittingDeal(false)
+    }
+  }
+
+  const handleDeleteDeal = async (dealId: string) => {
+    if (!confirm("Are you sure you want to delete this deal? This action cannot be undone.")) {
+      return
+    }
+
+    setDeletingDealId(dealId)
+    try {
+      const response = await fetch(`/api/admin/community-deals/${dealId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete deal")
+      }
+
+      setMessage({ type: "success", text: "Deal deleted successfully" })
+      fetchCommunityDeals()
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to delete deal" })
+    } finally {
+      setDeletingDealId(null)
+    }
+  }
 
   const fetchAllCoupons = async () => {
     setLoadingCoupons(true)
@@ -323,6 +462,91 @@ export default function AdminDashboard() {
     } finally {
       setSavingSettings(false)
       setTimeout(() => setSettingsMessage(null), 5000)
+    }
+  }
+
+  const handleSeedCommunityDeals = async () => {
+    if (!confirm('Are you sure you want to create fake community deals? This will add 10 deals with votes and comments.')) {
+      return
+    }
+
+    setSeedingDeals(true)
+    setSeedingMessage(null)
+
+    try {
+      const response = await fetch('/api/admin/seed-community-deals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to seed community deals')
+      }
+
+      const data = await response.json()
+      setSeedingMessage({ 
+        type: 'success', 
+        text: `Successfully created ${data.dealsCreated} fake community deals with votes and comments!` 
+      })
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'Failed to seed community deals'
+      setSeedingMessage({ type: 'error', text: messageText })
+    } finally {
+      setSeedingDeals(false)
+      setTimeout(() => setSeedingMessage(null), 10000)
+      // Refresh seed groups list after seeding
+      fetchSeedGroups()
+    }
+  }
+
+  const fetchSeedGroups = async () => {
+    setLoadingSeedGroups(true)
+    try {
+      const response = await fetch('/api/admin/seed-groups')
+      if (!response.ok) {
+        throw new Error('Failed to fetch seed groups')
+      }
+      const data = await response.json()
+      setSeedGroups(data.groups || [])
+    } catch (error) {
+      console.error('Error fetching seed groups:', error)
+    } finally {
+      setLoadingSeedGroups(false)
+    }
+  }
+
+  const handleDeleteSeedGroup = async (groupId: string) => {
+    if (!confirm(`Are you sure you want to delete this seed group? This will delete all ${seedGroups.find(g => g.seedGroupId === groupId)?.dealCount || 0} deals in this group.`)) {
+      return
+    }
+
+    setDeletingGroup(groupId)
+    try {
+      const response = await fetch(`/api/admin/seed-groups/${encodeURIComponent(groupId)}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to delete seed group')
+      }
+
+      const data = await response.json()
+      setSeedingMessage({ 
+        type: 'success', 
+        text: `Successfully deleted ${data.dealsDeleted} deals from seed group!` 
+      })
+      // Refresh seed groups list
+      fetchSeedGroups()
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'Failed to delete seed group'
+      setSeedingMessage({ type: 'error', text: messageText })
+    } finally {
+      setDeletingGroup(null)
+      setTimeout(() => setSeedingMessage(null), 10000)
     }
   }
 
@@ -1660,6 +1884,99 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Development Tools */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Development Tools</h3>
+                <div className="space-y-4">
+                  <div>
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Seed Community Deals</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Create 10 fake community deals with votes and comments for testing
+                      </p>
+                    </div>
+                    {seedingMessage && (
+                      <div
+                        className={`mb-3 rounded-lg p-3 text-sm ${
+                          seedingMessage.type === 'success'
+                            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                        }`}
+                      >
+                        {seedingMessage.text}
+                      </div>
+                    )}
+                    <Button
+                      onClick={handleSeedCommunityDeals}
+                      disabled={seedingDeals}
+                      className="w-full sm:w-auto"
+                    >
+                      {seedingDeals ? 'Creating deals...' : 'Seed Community Deals'}
+                    </Button>
+                  </div>
+
+                  {/* Seed Groups List */}
+                  <div>
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Seed Groups</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Manage created seed groups and delete them if needed
+                      </p>
+                    </div>
+                    {loadingSeedGroups ? (
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
+                        Loading seed groups...
+                      </div>
+                    ) : seedGroups.length === 0 ? (
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
+                        No seed groups found. Create one using the button above.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {seedGroups.map((group) => {
+                          const createdAt = new Date(group.createdAt)
+                          const formattedDate = new Intl.DateTimeFormat('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(createdAt)
+
+                          return (
+                            <div
+                              key={group.seedGroupId}
+                              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                    {group.dealCount} deals
+                                  </span>
+                                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    • {formattedDate}
+                                  </span>
+                                </div>
+                                <div className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                                  ID: {group.seedGroupId.substring(0, 20)}...
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteSeedGroup(group.seedGroupId)}
+                                disabled={deletingGroup === group.seedGroupId}
+                                className="ml-3 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingGroup === group.seedGroupId ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Advanced Settings */}
               <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Advanced Settings</h3>
@@ -1687,6 +2004,272 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Community Deals Section */}
+          {section === "community-deals" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">Community Deals</h1>
+                <p className="mt-2 text-zinc-600 dark:text-zinc-400">Manage community deals, edit or delete them</p>
+              </div>
+
+              {/* Filters */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Search deals..."
+                    value={dealSearchQuery}
+                    onChange={(e) => setDealSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        fetchCommunityDeals()
+                      }
+                    }}
+                    className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                  />
+                  <select
+                    value={dealStatusFilter}
+                    onChange={(e) => setDealStatusFilter(e.target.value as any)}
+                    className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="EXPIRED">Expired</option>
+                    <option value="REPORTED">Reported</option>
+                  </select>
+                  <select
+                    value={dealCategoryFilter}
+                    onChange={(e) => setDealCategoryFilter(e.target.value)}
+                    className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                  >
+                    <option value="ALL">All Categories</option>
+                    <option value="Food & Dining">Food & Dining</option>
+                    <option value="Fashion">Fashion</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Beauty & Health">Beauty & Health</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Home & Garden">Home & Garden</option>
+                    <option value="Sports & Fitness">Sports & Fitness</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <button
+                  onClick={fetchCommunityDeals}
+                  className="mt-4 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                >
+                  Apply Filters
+                </button>
+              </div>
+
+              {/* Deals Table */}
+              {loadingCommunityDeals ? (
+                <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="text-zinc-600 dark:text-zinc-400">Loading deals...</div>
+                </div>
+              ) : communityDeals.length === 0 ? (
+                <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="text-zinc-600 dark:text-zinc-400">No deals found</div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 dark:bg-zinc-900/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">Title</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">Category</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">User</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">Expires</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                        {communityDeals.map((deal) => (
+                          <tr key={deal.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                            <td className="px-4 py-3">
+                              <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{deal.title}</div>
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-1">{deal.description}</div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">{deal.category}</td>
+                            <td className="px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">{deal.user.name}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                deal.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                                deal.status === "EXPIRED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                              }`}>
+                                {deal.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">
+                              {new Date(deal.expiresAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditDeal(deal)}
+                                  className="rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDeal(deal.id)}
+                                  disabled={deletingDealId === deal.id}
+                                  className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                                >
+                                  {deletingDealId === deal.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Modal */}
+              {editingDealId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                  <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-2xl">
+                    <div className="sticky top-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Edit Deal</h2>
+                        <button
+                          onClick={() => setEditingDealId(null)}
+                          className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Title</label>
+                        <input
+                          type="text"
+                          value={dealForm.title}
+                          onChange={(e) => setDealForm({ ...dealForm, title: e.target.value })}
+                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
+                        <textarea
+                          value={dealForm.description}
+                          onChange={(e) => setDealForm({ ...dealForm, description: e.target.value })}
+                          rows={3}
+                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Category</label>
+                          <select
+                            value={dealForm.category}
+                            onChange={(e) => setDealForm({ ...dealForm, category: e.target.value })}
+                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          >
+                            <option value="Food & Dining">Food & Dining</option>
+                            <option value="Fashion">Fashion</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Beauty & Health">Beauty & Health</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Home & Garden">Home & Garden</option>
+                            <option value="Sports & Fitness">Sports & Fitness</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Status</label>
+                          <select
+                            value={dealForm.status}
+                            onChange={(e) => setDealForm({ ...dealForm, status: e.target.value as any })}
+                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          >
+                            <option value="ACTIVE">Active</option>
+                            <option value="EXPIRED">Expired</option>
+                            <option value="REPORTED">Reported</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Location</label>
+                        <input
+                          type="text"
+                          value={dealForm.location}
+                          onChange={(e) => setDealForm({ ...dealForm, location: e.target.value })}
+                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Coupon Code</label>
+                          <input
+                            type="text"
+                            value={dealForm.couponCode}
+                            onChange={(e) => setDealForm({ ...dealForm, couponCode: e.target.value })}
+                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Latitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={dealForm.latitude || ""}
+                            onChange={(e) => setDealForm({ ...dealForm, latitude: e.target.value ? parseFloat(e.target.value) : null })}
+                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Longitude</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={dealForm.longitude || ""}
+                            onChange={(e) => setDealForm({ ...dealForm, longitude: e.target.value ? parseFloat(e.target.value) : null })}
+                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Expires At</label>
+                        <input
+                          type="date"
+                          value={dealForm.expiresAt}
+                          onChange={(e) => setDealForm({ ...dealForm, expiresAt: e.target.value })}
+                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                        <button
+                          onClick={() => setEditingDealId(null)}
+                          className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveDeal}
+                          disabled={submittingDeal}
+                          className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          {submittingDeal ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
