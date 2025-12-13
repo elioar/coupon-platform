@@ -5,6 +5,7 @@ import { z } from "zod"
 
 const createCommentSchema = z.object({
   text: z.string().trim().min(1).max(100),
+  parentCommentId: z.string().optional(),
 })
 
 export async function GET(
@@ -15,10 +16,18 @@ export async function GET(
     const { id: dealId } = await context.params
 
     const comments = await prisma.communityDealComment.findMany({
-      where: { dealId },
+      where: { dealId, parentCommentId: null },
       include: {
         user: {
           select: { id: true, name: true },
+        },
+        replies: {
+          include: {
+            user: {
+              select: { id: true, name: true },
+            },
+          },
+          orderBy: { createdAt: "asc" },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -42,11 +51,25 @@ export async function POST(
     const body = await request.json()
     const validated = createCommentSchema.parse(body)
 
+    // If parentCommentId is provided, verify it exists and belongs to the same deal
+    if (validated.parentCommentId) {
+      const parentComment = await prisma.communityDealComment.findFirst({
+        where: {
+          id: validated.parentCommentId,
+          dealId,
+        },
+      })
+      if (!parentComment) {
+        return NextResponse.json({ error: "Parent comment not found" }, { status: 404 })
+      }
+    }
+
     const comment = await prisma.communityDealComment.create({
       data: {
         dealId,
         userId: user.id,
         text: validated.text,
+        parentCommentId: validated.parentCommentId || null,
       },
       include: {
         user: { select: { id: true, name: true } },

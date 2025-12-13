@@ -172,6 +172,8 @@ export default function AdminDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [selectedUserProfile, setSelectedUserProfile] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
+  const [grantingMembership, setGrantingMembership] = useState(false)
+  const [membershipExpiryDate, setMembershipExpiryDate] = useState<string>("")
   
   // Coupon management state
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
@@ -560,6 +562,28 @@ export default function AdminDashboard() {
       }
       const data = await response.json()
       setSelectedUserProfile(data.user)
+      
+      // Initialize date picker with default value (1 year from now or extend existing)
+      const now = new Date()
+      let defaultDate: Date
+      if (data.user.membershipExpiry) {
+        const currentExpiry = new Date(data.user.membershipExpiry)
+        if (currentExpiry > now) {
+          // Extend from current expiry
+          defaultDate = new Date(currentExpiry)
+          defaultDate.setDate(defaultDate.getDate() + 365)
+        } else {
+          // Start from now
+          defaultDate = new Date(now)
+          defaultDate.setDate(defaultDate.getDate() + 365)
+        }
+      } else {
+        // No existing membership, set to 1 year from now
+        defaultDate = new Date(now)
+        defaultDate.setDate(defaultDate.getDate() + 365)
+      }
+      // Format date for input (YYYY-MM-DD)
+      setMembershipExpiryDate(defaultDate.toISOString().split('T')[0])
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load user profile"
       setMessage({ type: "error", text: errorMessage })
@@ -567,9 +591,79 @@ export default function AdminDashboard() {
       setTimeout(() => {
         setSelectedUserId(null)
         setSelectedUserProfile(null)
+        setMembershipExpiryDate("")
       }, 3000)
     } finally {
       setLoadingProfile(false)
+    }
+  }
+
+  const grantMembership = async (userId: string) => {
+    if (!membershipExpiryDate) {
+      setMessage({ type: "error", text: "Please select a membership expiry date" })
+      return
+    }
+
+    setGrantingMembership(true)
+    setMessage(null)
+    try {
+      const selectedDate = new Date(membershipExpiryDate)
+      const now = new Date()
+
+      // Validate that the selected date is in the future
+      if (selectedDate <= now) {
+        setMessage({ type: "error", text: "Membership expiry date must be in the future" })
+        setGrantingMembership(false)
+        return
+      }
+
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          membershipExpiry: selectedDate.toISOString(),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to grant membership: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      // Update the user profile in state
+      setSelectedUserProfile({
+        ...selectedUserProfile,
+        membershipExpiry: data.user.membershipExpiry,
+      })
+
+      // Update the user in the users list
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { ...user, membershipExpiry: data.user.membershipExpiry }
+          : user
+      ))
+
+      // Update date picker to show the new expiry date
+      const newExpiryDate = new Date(data.user.membershipExpiry)
+      setMembershipExpiryDate(newExpiryDate.toISOString().split('T')[0])
+
+      setMessage({ 
+        type: "success", 
+        text: `Membership granted successfully. Expires: ${new Date(data.user.membershipExpiry).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` 
+      })
+      // Auto-dismiss success message after 5 seconds
+      setTimeout(() => {
+        setMessage(null)
+      }, 5000)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to grant membership"
+      setMessage({ type: "error", text: errorMessage })
+    } finally {
+      setGrantingMembership(false)
     }
   }
 
@@ -3272,6 +3366,7 @@ export default function AdminDashboard() {
           onClick={() => {
             setSelectedUserId(null)
             setSelectedUserProfile(null)
+            setMembershipExpiryDate("")
           }}
         >
           <div 
@@ -3315,6 +3410,27 @@ export default function AdminDashboard() {
 
                 {/* Content */}
                 <div className="p-6 space-y-6">
+                  {/* Message Display */}
+                  {message && (
+                    <div className={`rounded-xl border p-4 ${
+                      message.type === 'success' 
+                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {message.type === 'success' ? (
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                        <span className="font-medium">{message.text}</span>
+                      </div>
+                    </div>
+                  )}
                   {/* Basic Information */}
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
                     <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{t("basicInformation")}</h3>
@@ -3345,6 +3461,12 @@ export default function AdminDashboard() {
                           </p>
                         </div>
                       )}
+                      {!selectedUserProfile.membershipExpiry && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("membershipExpiry")}</p>
+                          <p className="mt-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">No active membership</p>
+                        </div>
+                      )}
                       {selectedUserProfile.phone && (
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{t("phone")}</p>
@@ -3371,6 +3493,45 @@ export default function AdminDashboard() {
                           <p className="mt-1 text-2xl font-bold text-violet-600 dark:text-violet-400">{selectedUserProfile._count.coupons}</p>
                         </div>
                       )}
+                    </div>
+                    {/* Grant Membership Section */}
+                    <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                            Membership Expiry Date
+                          </label>
+                          <input
+                            type="date"
+                            value={membershipExpiryDate}
+                            onChange={(e) => setMembershipExpiryDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                          />
+                        </div>
+                        <button
+                          onClick={() => grantMembership(selectedUserProfile.id)}
+                          disabled={grantingMembership || !membershipExpiryDate}
+                          className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:from-violet-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {grantingMembership ? (
+                            <>
+                              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Granting...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M12 4v16m8-8H4" />
+                              </svg>
+                              Grant
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
 

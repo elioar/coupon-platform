@@ -234,18 +234,22 @@ model CommunityDeal {
 }
 
 model CommunityDealComment {
-  id        String   @id @default(cuid())
-  dealId    String
-  userId    String
-  text      String   @db.VarChar(100)
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  dealId          String
+  userId          String
+  text            String   @db.VarChar(100)
+  parentCommentId String?
+  createdAt       DateTime @default(now())
 
-  deal CommunityDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal           CommunityDeal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment  CommunityDealComment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies        CommunityDealComment[] @relation("CommentReplies")
 
   @@index([dealId])
   @@index([userId])
   @@index([createdAt])
+  @@index([parentCommentId])
 }
 
 model CommunityDealVote {

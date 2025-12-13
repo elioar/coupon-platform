@@ -360,6 +360,10 @@
     "post": "Post",
     "posting": "Posting...",
     "noComments": "No comments yet. Be the first to comment!",
+    "reply": "Reply",
+    "replyingTo": "Replying to {name}",
+    "cancelReply": "Cancel",
+    "replyPlaceholder": "Write a reply...",
     "noDeals": "No deals available",
     "noDealsDescription": "Be the first to share a deal with the community!",
     "form": {
