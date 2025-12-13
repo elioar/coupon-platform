@@ -11,6 +11,8 @@ interface CommunityDeal {
   description: string
   category: string
   location: string
+  latitude?: number | null
+  longitude?: number | null
   imageUrl: string
   couponCode: string | null
   createdAt: string
