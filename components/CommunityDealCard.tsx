@@ -33,6 +33,8 @@ interface CommunityDealCardProps {
   onViewClick?: () => void
   canInteract?: boolean
   onVote?: (dealId: string, vote: "UP" | "DOWN") => Promise<void> | void
+  userLocation?: { lat: number; lng: number } | null
+  nearMeEnabled?: boolean
 }
 
 const formatDate = (dateString: string, locale: string) => {
@@ -58,20 +60,38 @@ export default function CommunityDealCard({
   onViewClick,
   canInteract = false,
   onVote,
+  userLocation,
+  nearMeEnabled = false,
 }: CommunityDealCardProps) {
   const t = useTranslations("community")
   const [isHovered, setIsHovered] = useState(false)
   const [isVoting, setIsVoting] = useState(false)
 
   const distanceLabel = (() => {
-    if (typeof deal.distanceKm !== "number") return null
-    if (Number.isNaN(deal.distanceKm)) return null
+    // Use distanceKm from deal if available, otherwise calculate it
+    let distanceKm = deal.distanceKm
+    
+    if (distanceKm == null && nearMeEnabled && userLocation && typeof deal.latitude === "number" && typeof deal.longitude === "number") {
+      // Calculate distance if not provided
+      const toRad = (value: number) => (value * Math.PI) / 180
+      const R = 6371 // km
+      const dLat = toRad(deal.latitude - userLocation.lat)
+      const dLon = toRad(deal.longitude - userLocation.lng)
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(userLocation.lat)) * Math.cos(toRad(deal.latitude)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      distanceKm = R * c
+    }
+    
+    if (typeof distanceKm !== "number") return null
+    if (Number.isNaN(distanceKm)) return null
     const numberFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 })
     const integerFormatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
-    if (deal.distanceKm >= 1) {
-      return t("distanceAwayKm", { distance: numberFormatter.format(deal.distanceKm) })
+    if (distanceKm >= 1) {
+      return t("distanceAwayKm", { distance: numberFormatter.format(distanceKm) })
     }
-    const meters = Math.round(deal.distanceKm * 1000)
+    const meters = Math.round(distanceKm * 1000)
     return t("distanceAwayMeters", { distance: integerFormatter.format(meters) })
   })()
 
