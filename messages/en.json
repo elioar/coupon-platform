@@ -200,6 +200,37 @@
         "setExactLocation": "Set Your Exact Location",
         "mapInstructions": "Drag the pin or click on the map to set your exact business location. City and postal code will be filled automatically."
       }
+    },
+    "verifyEmail": {
+      "title": "Verify Your Email",
+      "subtitle": "Please verify your email address to continue",
+      "checking": "Verifying your email...",
+      "success": "Email verified successfully!",
+      "error": "Invalid or expired verification token",
+      "redirecting": "Redirecting to login...",
+      "resend": "Resend verification email",
+      "resendSuccess": "Verification email sent!",
+      "resendError": "Failed to send verification email"
+    },
+    "forgotPassword": {
+      "title": "Forgot Password",
+      "subtitle": "Enter your email to receive a password reset link",
+      "email": "Email",
+      "submit": "Send Reset Link",
+      "success": "Password reset email sent!",
+      "error": "Failed to send password reset email",
+      "backToLogin": "Back to login"
+    },
+    "resetPassword": {
+      "title": "Reset Password",
+      "subtitle": "Enter your new password",
+      "password": "New Password",
+      "confirmPassword": "Confirm Password",
+      "submit": "Reset Password",
+      "success": "Password reset successfully!",
+      "error": "Invalid or expired reset token",
+      "passwordMismatch": "Passwords do not match",
+      "redirecting": "Redirecting to login..."
     }
   },
   "membership": {

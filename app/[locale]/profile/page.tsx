@@ -9,6 +9,8 @@ import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
 interface ProfileResponse {
   profile: {
     name: string
+    email: string
+    emailVerified: boolean
     address: string | null
     birthDate: string | null
     phone: string | null
@@ -85,6 +87,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<MessageState>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [emailVerified, setEmailVerified] = useState<boolean>(false)
+  const [sendingVerification, setSendingVerification] = useState(false)
 
   const isBusiness = useMemo(() => session?.user.role === "BUSINESS", [session?.user.role])
   const businessMeta = useMemo(
@@ -141,6 +145,7 @@ export default function ProfilePage() {
         const data = (await res.json()) as ProfileResponse
         const profile = data.profile
         const meta = parseBusinessMeta(profile.businessDescription ?? null)
+        setEmailVerified(profile.emailVerified ?? false)
         setFormData({
           name: profile.name ?? "",
           address: profile.address ?? "",
@@ -247,6 +252,44 @@ export default function ProfilePage() {
     }
   }
 
+  const handleResendVerification = async () => {
+    if (!session?.user?.email) return
+    
+    setSendingVerification(true)
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: session.user.email, locale }),
+      })
+
+      if (response.ok) {
+        setMessage({ type: "success", text: locale === "el" ? "Το email επαλήθευσης στάλθηκε! Ελέγξτε το inbox σας." : "Verification email sent! Please check your inbox." })
+        // Refresh profile to check if email was verified
+        setTimeout(async () => {
+          try {
+            const res = await fetch("/api/profile")
+            if (res.ok) {
+              const data = (await res.json()) as ProfileResponse
+              setEmailVerified(data.profile.emailVerified ?? false)
+              if (data.profile.emailVerified) {
+                await update()
+              }
+            }
+          } catch (error) {
+            // Silent fail
+          }
+        }, 2000)
+      } else {
+        setMessage({ type: "error", text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." })
+    } finally {
+      setSendingVerification(false)
+    }
+  }
+
   const renderInput = (
     label: string,
     field: keyof ProfileFormState,
@@ -311,7 +354,44 @@ export default function ProfilePage() {
             <div>
               <p className="text-xs uppercase tracking-[0.6em] text-emerald-100/70">{tCommon("appName")}</p>
               <h1 className="mt-2 text-4xl font-semibold text-white">{tProfile("title")}</h1>
-              <p className="mt-1 text-sm text-white/70">{session?.user.email}</p>
+              <div className="mt-2 flex items-center gap-3">
+                <p className="text-sm text-white/70">{session?.user.email}</p>
+                {emailVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-300 border border-emerald-500/30">
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {locale === "el" ? "Επαληθευμένο" : "Verified"}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-300 border border-amber-500/30">
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {locale === "el" ? "Μη επαληθευμένο" : "Not Verified"}
+                  </span>
+                )}
+              </div>
+              {!emailVerified && (
+                <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                  <p className="text-xs text-amber-200/80 mb-2">
+                    {locale === "el" 
+                      ? "Το email σας δεν είναι επαληθευμένο. Παρακαλώ επαληθεύστε το email σας για πλήρη πρόσβαση." 
+                      : "Your email is not verified. Please verify your email for full access."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={sendingVerification}
+                    className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-amber-500/30 transition hover:shadow-amber-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingVerification 
+                      ? (locale === "el" ? "Αποστολή..." : "Sending...")
+                      : (locale === "el" ? "Αποστολή Email Επαλήθευσης" : "Send Verification Email")
+                    }
+                  </button>
+                </div>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-500/25 via-emerald-500/5 to-transparent p-4">

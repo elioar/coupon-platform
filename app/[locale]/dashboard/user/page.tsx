@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import DashboardSidebar from "@/components/DashboardSidebar"
 import DashboardHeader from "@/components/DashboardHeader"
 import CouponCard from "@/components/CouponCard"
@@ -32,6 +33,8 @@ interface Coupon {
 interface ProfileResponse {
   profile: {
     name: string
+    email: string
+    emailVerified: boolean
     address: string | null
     birthDate: string | null
     phone: string | null
@@ -82,9 +85,131 @@ export default function UserDashboard() {
   const lastRefreshedSection = useRef<string | null>(null)
   const [dbMembershipExpiry, setDbMembershipExpiry] = useState<string | null>(null)
   const [dbHasActiveMembership, setDbHasActiveMembership] = useState<boolean>(false)
+  const [emailVerified, setEmailVerified] = useState<boolean>(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
 
   // Recalculate membership status - use DB data if available, otherwise use session
   const userIsMember = dbHasActiveMembership || (session?.user ? isMember(session.user) : false)
+
+  // Password strength checker
+  const checkPasswordStrength = (password: string) => {
+    let strength = 0
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    }
+
+    if (checks.length) strength++
+    if (checks.lowercase) strength++
+    if (checks.uppercase) strength++
+    if (checks.number) strength++
+    if (checks.special) strength++
+
+    return { strength, checks }
+  }
+
+  const passwordStrength = checkPasswordStrength(passwordData.newPassword)
+  const strengthLabels = ["Very Weak", "Weak", "Fair", "Good", "Strong"]
+  const strengthColors = [
+    "from-red-500 to-red-600",
+    "from-orange-500 to-orange-600",
+    "from-yellow-500 to-yellow-600",
+    "from-blue-500 to-blue-600",
+    "from-green-500 to-emerald-600",
+  ]
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Οι κωδικοί δεν ταιριάζουν" : "Passwords do not match",
+      })
+      return
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" : "Password must be at least 8 characters",
+      })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage({
+          type: "success",
+          text: locale === "el" ? "Ο κωδικός άλλαξε επιτυχώς" : "Password changed successfully",
+        })
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        })
+        setTimeout(() => {
+          setShowPasswordModal(false)
+        }, 1500)
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || (locale === "el" ? "Αποτυχία αλλαγής κωδικού" : "Failed to change password"),
+        })
+      }
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Αποτυχία αλλαγής κωδικού" : "Failed to change password",
+      })
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+  
+  // Fetch email verification status
+  useEffect(() => {
+    const fetchEmailVerification = async () => {
+      if (!session?.user?.id) return
+      
+      try {
+        const res = await fetch("/api/profile")
+        if (res.ok) {
+          const data = await res.json()
+          setEmailVerified(data.profile.emailVerified ?? false)
+        }
+      } catch (error) {
+        // Silent fail
+      }
+    }
+    
+    fetchEmailVerification()
+  }, [session?.user?.id])
   
   // Fetch membership status directly from database (bypasses session cache)
   const fetchMembershipStatus = async () => {
@@ -209,10 +334,10 @@ export default function UserDashboard() {
     }
   }, [])
 
-  // Fetch profile
+  // Fetch profile and email verification status
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!session || section !== "profile") return
+      if (!session) return
 
       try {
         const res = await fetch("/api/profile")
@@ -220,15 +345,21 @@ export default function UserDashboard() {
 
         const data = (await res.json()) as ProfileResponse
         const profile = data.profile
-        setProfileData({
-          name: profile.name ?? "",
-          address: profile.address ?? "",
-          birthDate: profile.birthDate ? profile.birthDate.slice(0, 10) : "",
-          phone: profile.phone ?? "",
-          about: profile.about ?? "",
-        })
+        setEmailVerified(profile.emailVerified ?? false)
+        
+        if (section === "profile") {
+          setProfileData({
+            name: profile.name ?? "",
+            address: profile.address ?? "",
+            birthDate: profile.birthDate ? profile.birthDate.slice(0, 10) : "",
+            phone: profile.phone ?? "",
+            about: profile.about ?? "",
+          })
+        }
       } catch (error) {
-        setMessage({ type: "error", text: tProfile("error") })
+        if (section === "profile") {
+          setMessage({ type: "error", text: tProfile("error") })
+        }
       }
     }
 
@@ -601,6 +732,88 @@ export default function UserDashboard() {
               </div>
             )}
 
+            {/* Email Verification Status */}
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                    <svg className="h-5 w-5 text-zinc-600 dark:text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {session?.user.email}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {emailVerified 
+                        ? (locale === "el" ? "Το email σας είναι επαληθευμένο" : "Your email is verified")
+                        : (locale === "el" ? "Το email σας δεν είναι επαληθευμένο" : "Your email is not verified")
+                      }
+                    </p>
+                  </div>
+                </div>
+                {emailVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {locale === "el" ? "Επαληθευμένο" : "Verified"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!session?.user?.email) return
+                      try {
+                        const response = await fetch("/api/auth/resend-verification", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: session.user.email, locale }),
+                        })
+                        if (response.ok) {
+                          setMessage({ 
+                            type: "success", 
+                            text: locale === "el" ? "Το email επαλήθευσης στάλθηκε! Ελέγξτε το inbox σας." : "Verification email sent! Please check your inbox." 
+                          })
+                          setTimeout(async () => {
+                            try {
+                              const res = await fetch("/api/profile")
+                              if (res.ok) {
+                                const data = await res.json()
+                                setEmailVerified(data.profile.emailVerified ?? false)
+                                if (data.profile.emailVerified) {
+                                  await update()
+                                }
+                              }
+                            } catch (error) {
+                              // Silent fail
+                            }
+                          }, 2000)
+                        } else {
+                          setMessage({ 
+                            type: "error", 
+                            text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." 
+                          })
+                        }
+                      } catch (error) {
+                        setMessage({ 
+                          type: "error", 
+                          text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." 
+                        })
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {locale === "el" ? "Αποστολή Email Επαλήθευσης" : "Send Verification Email"}
+                  </button>
+                )}
+              </div>
+            </div>
+
             <form onSubmit={handleProfileSubmit} className="space-y-6">
               <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
                 <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
@@ -691,6 +904,286 @@ export default function UserDashboard() {
                 </button>
               </div>
             </form>
+
+            {/* Password Change Button */}
+            <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
+                    {locale === "el" ? "Ασφάλεια" : "Security"}
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    {locale === "el" ? "Αλλάξτε τον κωδικό πρόσβασής σας" : "Change your account password"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700"
+                >
+                  {locale === "el" ? "Αλλαγή Κωδικού" : "Change Password"}
+                </button>
+              </div>
+            </div>
+
+            {/* Password Change Modal */}
+            {showPasswordModal && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setShowPasswordModal(false)
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    })
+                  }
+                }}
+              >
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+                <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 overflow-hidden">
+                  <div className="border-b border-zinc-200 bg-gradient-to-br from-violet-50 to-white px-6 py-5 dark:border-zinc-800 dark:from-violet-950/30 dark:to-zinc-900">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                          {locale === "el" ? "Αλλαγή Κωδικού" : "Change Password"}
+                        </h3>
+                        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                          {locale === "el" ? "Εισάγετε τον τρέχοντα και τον νέο κωδικό" : "Enter your current and new password"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPasswordModal(false)
+                          setPasswordData({
+                            currentPassword: "",
+                            newPassword: "",
+                            confirmPassword: "",
+                          })
+                        }}
+                        className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                      >
+                        <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+                    {/* Current Password */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {locale === "el" ? "Τρέχων Κωδικός" : "Current Password"}
+                        </label>
+                        <Link
+                          href={`/${locale}/forgot-password`}
+                          className="text-xs text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                        >
+                          {locale === "el" ? "Ξέχασα τον κωδικό μου" : "Forgot password?"}
+                        </Link>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          required
+                          value={passwordData.currentPassword}
+                          onChange={(e) =>
+                            setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                          }
+                          className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-10 text-zinc-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          {showCurrentPassword ? (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {locale === "el" ? "Νέος Κωδικός" : "New Password"}
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        required
+                        value={passwordData.newPassword}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, newPassword: e.target.value })
+                        }
+                        className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-10 text-zinc-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        {showNewPassword ? (
+                          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {/* Password Strength Indicator */}
+                    {passwordData.newPassword && (
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                            <div
+                              className={`h-full bg-gradient-to-r ${strengthColors[passwordStrength.strength] || strengthColors[0]}`}
+                              style={{ width: `${((passwordStrength.strength + 1) / 5) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                            {strengthLabels[passwordStrength.strength] || strengthLabels[0]}
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-xs">
+                          <div className={`flex items-center gap-2 ${passwordStrength.checks.length ? "text-green-600 dark:text-green-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                            <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              {passwordStrength.checks.length ? (
+                                <path d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path d="M6 18L18 6M6 6l12 12" />
+                              )}
+                            </svg>
+                            {locale === "el" ? "Τουλάχιστον 8 χαρακτήρες" : "At least 8 characters"}
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordStrength.checks.lowercase ? "text-green-600 dark:text-green-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                            <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              {passwordStrength.checks.lowercase ? (
+                                <path d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path d="M6 18L18 6M6 6l12 12" />
+                              )}
+                            </svg>
+                            {locale === "el" ? "Μικρά γράμματα" : "Lowercase letters"}
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordStrength.checks.uppercase ? "text-green-600 dark:text-green-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                            <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              {passwordStrength.checks.uppercase ? (
+                                <path d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path d="M6 18L18 6M6 6l12 12" />
+                              )}
+                            </svg>
+                            {locale === "el" ? "Κεφαλαία γράμματα" : "Uppercase letters"}
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordStrength.checks.number ? "text-green-600 dark:text-green-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                            <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              {passwordStrength.checks.number ? (
+                                <path d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path d="M6 18L18 6M6 6l12 12" />
+                              )}
+                            </svg>
+                            {locale === "el" ? "Αριθμοί" : "Numbers"}
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordStrength.checks.special ? "text-green-600 dark:text-green-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                            <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              {passwordStrength.checks.special ? (
+                                <path d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path d="M6 18L18 6M6 6l12 12" />
+                              )}
+                            </svg>
+                            {locale === "el" ? "Ειδικοί χαρακτήρες" : "Special characters"}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {locale === "el" ? "Επιβεβαίωση Κωδικού" : "Confirm Password"}
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={passwordData.confirmPassword}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                        }
+                        className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-10 text-zinc-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        {showConfirmPassword ? (
+                          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                        {locale === "el" ? "Οι κωδικοί δεν ταιριάζουν" : "Passwords do not match"}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasswordModal(false)
+                        setPasswordData({
+                          currentPassword: "",
+                          newPassword: "",
+                          confirmPassword: "",
+                        })
+                      }}
+                      className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    >
+                      {locale === "el" ? "Ακύρωση" : "Cancel"}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={changingPassword}
+                      className="flex-1 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      {changingPassword ? tCommon("loading") : (locale === "el" ? "Αλλαγή Κωδικού" : "Change Password")}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            )}
           </div>
         )
 
@@ -747,179 +1240,62 @@ export default function UserDashboard() {
           : null
 
         return (
-          <div className="space-y-6 sm:space-y-8">
-            {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-3xl">
-                {t("membership")}
-              </h1>
-              <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">
-                {tMembership("manageMembership")}
-              </p>
-            </div>
+          <div className="space-y-3">
+            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              {t("membership")}
+            </h1>
 
-            {/* Membership Status Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-gradient-to-br from-violet-50 via-white to-violet-50/50 p-8 shadow-lg dark:border-zinc-800 dark:from-violet-950/20 dark:via-zinc-900 dark:to-violet-950/10 sm:p-10">
-              {/* Decorative Background Elements */}
-              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-200/30 blur-3xl dark:bg-violet-900/20" />
-              <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/10" />
-              
-              <div className="relative z-10">
-                {isActiveMember ? (
-                  <div className="space-y-6">
-                    {/* Active Status */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg shadow-green-500/30">
-                          <svg
-                            className="h-8 w-8 text-white"
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2.5"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-                            {tMembership("activeMember")}
-                          </h2>
-                          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                            {tMembership("premiumAccess")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="rounded-full bg-green-100 px-4 py-1.5 dark:bg-green-900/30">
-                        <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                          {tMembership("active")}
+            {isActiveMember ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+                  <div>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {tMembership("activeMember")}
+                    </span>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {tMembership("expiresOn")} {formatDate(membershipExpiry)}
+                      {daysUntilExpiry !== null && daysUntilExpiry > 0 && (
+                        <span className="ml-1.5">
+                          {daysUntilExpiry === 1 
+                            ? `(${tMembership("expiresTomorrow")})`
+                            : `(${tMembership("expiresInDays", { days: daysUntilExpiry })})`
+                          }
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Expiry Info */}
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                        <div className="mb-2 flex items-center gap-2">
-                          <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                            {tMembership("expiresOn")}
-                          </h3>
-                        </div>
-                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                          {formatDate(membershipExpiry)}
-                        </p>
-                        {daysUntilExpiry !== null && daysUntilExpiry > 0 && (
-                          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                            {daysUntilExpiry === 1 
-                              ? tMembership("expiresTomorrow")
-                              : tMembership("expiresInDays", { days: daysUntilExpiry })
-                            }
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                        <div className="mb-2 flex items-center gap-2">
-                          <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                            {tMembership("benefits.title")}
-                          </h3>
-                        </div>
-                        <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                          {tMembership("unlimitedAccess")}
-                        </p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                          {tMembership("allFeaturesUnlocked")}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Renew Button */}
-                    {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
-                      <a
-                        href={`/${locale}/membership`}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-3.5 font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 sm:w-auto"
-                      >
-                        <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        {tMembership("renew")}
-                      </a>
-                    )}
+                      )}
+                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-6 text-center">
-                    {/* Inactive Status */}
-                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-800 dark:to-zinc-700">
-                      <svg
-                        className="h-10 w-10 text-zinc-600 dark:text-zinc-400"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-                        {tMembership("notMember")}
-                      </h2>
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                        {tMembership("upgradeToUnlock")}
-                      </p>
-                    </div>
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                    {tMembership("active")}
+                  </span>
+                </div>
 
-
-                    {/* Upgrade CTA */}
-                    <a
-                      href={`/${locale}/membership`}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 px-8 py-4 font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:from-violet-700 hover:to-violet-800 hover:shadow-xl hover:shadow-violet-500/40 sm:w-auto"
-                    >
-                      <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                        <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      {tMembership("upgradeToPremium")}
-                    </a>
-                  </div>
+                {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
+                  <a
+                    href={`/${locale}/membership`}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                  >
+                    {tMembership("renew")}
+                  </a>
                 )}
               </div>
-            </div>
-
-            {/* Benefits Section - Only show if member */}
-            {isActiveMember && (
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
-                <h2 className="mb-6 text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">
-                  {tMembership("benefits.title")}
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {[
-                    { icon: "unlimited", text: tMembership("benefits.unlimited") },
-                    { icon: "exclusive", text: tMembership("benefits.exclusive") },
-                    { icon: "early", text: tMembership("benefits.early") },
-                    { icon: "support", text: tMembership("benefits.support") },
-                  ].map((benefit, index) => (
-                    <div key={index} className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                        <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                          <path d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                        {benefit.text}
-                      </p>
-                    </div>
-                  ))}
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+                  <div>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {tMembership("notMember")}
+                    </span>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {tMembership("upgradeToUnlock")}
+                    </p>
+                  </div>
                 </div>
+                <a
+                  href={`/${locale}/membership`}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                >
+                  {tMembership("upgradeToPremium")}
+                </a>
               </div>
             )}
           </div>
@@ -1273,6 +1649,7 @@ export default function UserDashboard() {
         locale={locale}
         isMobileMenuOpen={isMobileMenuOpen}
         onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        emailVerified={emailVerified}
       />
 
       <main className="ml-0 flex-1 overflow-x-hidden pt-16 lg:ml-72">

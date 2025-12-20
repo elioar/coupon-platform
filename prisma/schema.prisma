@@ -60,6 +60,7 @@ model User {
   email               String    @unique
   password            String
   name                String
+  emailVerified       Boolean   @default(false)
   address             String?
   birthDate           DateTime?
   phone               String?
@@ -86,9 +87,12 @@ model User {
   communityDeals    CommunityDeal[]
   communityDealComments CommunityDealComment[]
   communityDealVotes    CommunityDealVote[]
+  verificationTokens VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([role])
+  @@index([emailVerified])
 }
 
 model Category {
@@ -267,4 +271,32 @@ model CommunityDealVote {
   @@index([dealId])
   @@index([userId])
   @@index([value])
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
 }

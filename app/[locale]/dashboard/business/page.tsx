@@ -210,6 +210,17 @@ export default function BusinessDashboard() {
     businessTikTok: "",
   })
   const [saving, setSaving] = useState(false)
+  const [emailVerified, setEmailVerified] = useState<boolean>(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
 
   // Analytics state
   const [analytics, setAnalytics] = useState<any>(null)
@@ -219,6 +230,25 @@ export default function BusinessDashboard() {
     views: 0,
     redemptions: 0
   })
+
+  // Fetch email verification status
+  useEffect(() => {
+    const fetchEmailVerification = async () => {
+      if (!session?.user?.id) return
+      
+      try {
+        const res = await fetch("/api/profile")
+        if (res.ok) {
+          const data = await res.json()
+          setEmailVerified(data.profile.emailVerified ?? false)
+        }
+      } catch (error) {
+        // Silent fail
+      }
+    }
+    
+    fetchEmailVerification()
+  }, [session?.user?.id])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -683,10 +713,10 @@ export default function BusinessDashboard() {
     })
   }
 
-  // Fetch profile for profile section
+  // Fetch profile and email verification status
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!session || section !== "profile") return
+      if (!session) return
 
       try {
         const res = await fetch("/api/profile")
@@ -694,6 +724,9 @@ export default function BusinessDashboard() {
 
         const data = await res.json()
         const profile = data.profile
+        setEmailVerified(profile.emailVerified ?? false)
+        
+        if (section !== "profile") return
         
         const parseBusinessMeta = (raw: string | null) => {
           if (!raw) return { raw: "", vatNumber: "", city: "", postalCode: "" }
@@ -830,6 +863,98 @@ export default function BusinessDashboard() {
       } catch (err) {
         // Failed to copy - silently fail
       }
+  }
+
+  // Password strength checker
+  const checkPasswordStrength = (password: string) => {
+    let strength = 0
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    }
+
+    if (checks.length) strength++
+    if (checks.lowercase) strength++
+    if (checks.uppercase) strength++
+    if (checks.number) strength++
+    if (checks.special) strength++
+
+    return { strength, checks }
+  }
+
+  const passwordStrength = checkPasswordStrength(passwordData.newPassword)
+  const strengthLabels = ["Very Weak", "Weak", "Fair", "Good", "Strong"]
+  const strengthColors = [
+    "from-red-500 to-red-600",
+    "from-orange-500 to-orange-600",
+    "from-yellow-500 to-yellow-600",
+    "from-blue-500 to-blue-600",
+    "from-green-500 to-emerald-600",
+  ]
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Οι κωδικοί δεν ταιριάζουν" : "Passwords do not match",
+      })
+      return
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" : "Password must be at least 8 characters",
+      })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage({
+          type: "success",
+          text: locale === "el" ? "Ο κωδικός άλλαξε επιτυχώς" : "Password changed successfully",
+        })
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        })
+        setTimeout(() => {
+          setShowPasswordModal(false)
+        }, 1500)
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || (locale === "el" ? "Αποτυχία αλλαγής κωδικού" : "Failed to change password"),
+        })
+      }
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: locale === "el" ? "Αποτυχία αλλαγής κωδικού" : "Failed to change password",
+      })
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1288,6 +1413,88 @@ export default function BusinessDashboard() {
                 </div>
               )}
 
+            {/* Email Verification Status */}
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex items-center justify-between p-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                    <svg className="h-5 w-5 text-zinc-600 dark:text-zinc-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {session?.user.email}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">
+                      {emailVerified 
+                        ? (locale === "el" ? "Το email σας είναι επαληθευμένο" : "Your email is verified")
+                        : (locale === "el" ? "Το email σας δεν είναι επαληθευμένο" : "Your email is not verified")
+                      }
+                    </p>
+                  </div>
+                </div>
+                {emailVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {locale === "el" ? "Επαληθευμένο" : "Verified"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!session?.user?.email) return
+                      try {
+                        const response = await fetch("/api/auth/resend-verification", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: session.user.email, locale }),
+                        })
+                        if (response.ok) {
+                          setMessage({ 
+                            type: "success", 
+                            text: locale === "el" ? "Το email επαλήθευσης στάλθηκε! Ελέγξτε το inbox σας." : "Verification email sent! Please check your inbox." 
+                          })
+                          setTimeout(async () => {
+                            try {
+                              const res = await fetch("/api/profile")
+                              if (res.ok) {
+                                const data = await res.json()
+                                setEmailVerified(data.profile.emailVerified ?? false)
+                                if (data.profile.emailVerified) {
+                                  await update()
+                                }
+                              }
+                            } catch (error) {
+                              // Silent fail
+                            }
+                          }, 2000)
+                        } else {
+                          setMessage({ 
+                            type: "error", 
+                            text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." 
+                          })
+                        }
+                      } catch (error) {
+                        setMessage({ 
+                          type: "error", 
+                          text: locale === "el" ? "Αποτυχία αποστολής email επαλήθευσης." : "Failed to send verification email." 
+                        })
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {locale === "el" ? "Αποστολή Email Επαλήθευσης" : "Send Verification Email"}
+                  </button>
+                )}
+              </div>
+            </div>
+
             <form onSubmit={handleProfileSubmit} className="space-y-6">
                 {/* Basic Information */}
               <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -1541,6 +1748,299 @@ export default function BusinessDashboard() {
                 </button>
                 </div>
               </form>
+
+              {/* Password Change Button */}
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 mt-6">
+                <div className="flex items-center justify-between p-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {locale === "el" ? "Ασφάλεια" : "Security"}
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
+                      {locale === "el" ? "Αλλάξτε τον κωδικό πρόσβασής σας" : "Change your account password"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.98] dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700"
+                  >
+                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" stroke="currentColor">
+                      <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    {locale === "el" ? "Αλλαγή Κωδικού" : "Change Password"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Password Change Modal */}
+              {showPasswordModal && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setShowPasswordModal(false)
+                      setPasswordData({
+                        currentPassword: "",
+                        newPassword: "",
+                        confirmPassword: "",
+                      })
+                    }
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+                  <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 overflow-hidden">
+                    <div className="border-b border-gray-200 bg-gradient-to-br from-blue-50 to-white px-6 py-5 dark:border-zinc-800 dark:from-blue-950/30 dark:to-zinc-900">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                            {locale === "el" ? "Αλλαγή Κωδικού" : "Change Password"}
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
+                            {locale === "el" ? "Εισάγετε τον τρέχοντα και τον νέο κωδικό" : "Enter your current and new password"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPasswordModal(false)
+                            setPasswordData({
+                              currentPassword: "",
+                              newPassword: "",
+                              confirmPassword: "",
+                            })
+                          }}
+                          className="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        >
+                          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+                      {/* Current Password */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                            {locale === "el" ? "Τρέχων Κωδικός" : "Current Password"}
+                          </label>
+                          <Link
+                            href={`/${locale}/forgot-password`}
+                            className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {locale === "el" ? "Ξέχασα τον κωδικό μου" : "Forgot password?"}
+                          </Link>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showCurrentPassword ? "text" : "password"}
+                            required
+                            value={passwordData.currentPassword}
+                            onChange={(e) =>
+                              setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                            }
+                            className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:shadow-lg focus:shadow-blue-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                          >
+                            {showCurrentPassword ? (
+                              <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                    {/* New Password */}
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        {locale === "el" ? "Νέος Κωδικός" : "New Password"}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          required
+                          value={passwordData.newPassword}
+                          onChange={(e) =>
+                            setPasswordData({ ...passwordData, newPassword: e.target.value })
+                          }
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:shadow-lg focus:shadow-blue-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          {showNewPassword ? (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      
+                      {/* Password Strength Indicator */}
+                      {passwordData.newPassword && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-zinc-700">
+                              <div
+                                className={`h-full bg-gradient-to-r ${strengthColors[passwordStrength.strength] || strengthColors[0]}`}
+                                style={{ width: `${((passwordStrength.strength + 1) / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-600 dark:text-zinc-400">
+                              {strengthLabels[passwordStrength.strength] || strengthLabels[0]}
+                            </span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className={`flex items-center gap-2 ${passwordStrength.checks.length ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}>
+                              <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                {passwordStrength.checks.length ? (
+                                  <path d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path d="M6 18L18 6M6 6l12 12" />
+                                )}
+                              </svg>
+                              {locale === "el" ? "Τουλάχιστον 8 χαρακτήρες" : "At least 8 characters"}
+                            </div>
+                            <div className={`flex items-center gap-2 ${passwordStrength.checks.lowercase ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}>
+                              <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                {passwordStrength.checks.lowercase ? (
+                                  <path d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path d="M6 18L18 6M6 6l12 12" />
+                                )}
+                              </svg>
+                              {locale === "el" ? "Μικρά γράμματα" : "Lowercase letters"}
+                            </div>
+                            <div className={`flex items-center gap-2 ${passwordStrength.checks.uppercase ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}>
+                              <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                {passwordStrength.checks.uppercase ? (
+                                  <path d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path d="M6 18L18 6M6 6l12 12" />
+                                )}
+                              </svg>
+                              {locale === "el" ? "Κεφαλαία γράμματα" : "Uppercase letters"}
+                            </div>
+                            <div className={`flex items-center gap-2 ${passwordStrength.checks.number ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}>
+                              <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                {passwordStrength.checks.number ? (
+                                  <path d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path d="M6 18L18 6M6 6l12 12" />
+                                )}
+                              </svg>
+                              {locale === "el" ? "Αριθμοί" : "Numbers"}
+                            </div>
+                            <div className={`flex items-center gap-2 ${passwordStrength.checks.special ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-zinc-400"}`}>
+                              <svg className="h-3.5 w-3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                {passwordStrength.checks.special ? (
+                                  <path d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path d="M6 18L18 6M6 6l12 12" />
+                                )}
+                              </svg>
+                              {locale === "el" ? "Ειδικοί χαρακτήρες" : "Special characters"}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                        {locale === "el" ? "Επιβεβαίωση Κωδικού" : "Confirm Password"}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          required
+                          value={passwordData.confirmPassword}
+                          onChange={(e) =>
+                            setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                          }
+                          className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 pr-12 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:shadow-lg focus:shadow-blue-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          {showConfirmPassword ? (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          {locale === "el" ? "Οι κωδικοί δεν ταιριάζουν" : "Passwords do not match"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPasswordModal(false)
+                          setPasswordData({
+                            currentPassword: "",
+                            newPassword: "",
+                            confirmPassword: "",
+                          })
+                        }}
+                        className="flex-1 rounded-xl border-2 border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+                      >
+                        {locale === "el" ? "Ακύρωση" : "Cancel"}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={changingPassword}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700"
+                      >
+                        {changingPassword ? (
+                          <>
+                            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>{locale === "el" ? "Αλλαγή..." : "Changing..."}</span>
+                          </>
+                        ) : (
+                          <span>{locale === "el" ? "Αλλαγή Κωδικού" : "Change Password"}</span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
             </div>
         )
 
@@ -2228,6 +2728,7 @@ export default function BusinessDashboard() {
         locale={locale}
         isMobileMenuOpen={isMobileMenuOpen}
         onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        emailVerified={emailVerified}
       />
 
       <main className="ml-0 flex-1 overflow-x-hidden pt-16 lg:ml-72">

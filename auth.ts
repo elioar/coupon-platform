@@ -8,6 +8,7 @@ import type { Adapter } from "next-auth/adapters"
 
 const userProfileSelection = {
   role: true,
+  emailVerified: true,
   membershipExpiry: true,
   name: true,
   address: true,
@@ -122,11 +123,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null
         }
 
+        // Check if email is verified
+        if (!user.emailVerified) {
+          // Return user but with a flag that email is not verified
+          // We'll handle this in the UI to show verification message
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            emailVerified: false,
+          }
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          emailVerified: true,
         }
       },
     }),
@@ -141,6 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (dbUser) {
           token.role = dbUser.role
+          token.emailVerified = dbUser.emailVerified
           token.membershipExpiry = dbUser.membershipExpiry?.toISOString() ?? null
           token.name = dbUser.name
           token.address = dbUser.address ?? null
@@ -162,6 +178,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user && user.id) {
         token.id = user.id
         token.email = user.email
+        token.emailVerified = (user as any).emailVerified ?? false
         await hydrateTokenFromDb(user.id)
       }
 
@@ -196,6 +213,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as Role
+        // @ts-expect-error - NextAuth's default emailVerified is Date | null, but we use boolean
+        session.user.emailVerified = Boolean(token.emailVerified ?? false)
         session.user.membershipExpiry = (token.membershipExpiry as string | null) ?? null
         session.user.name = (token.name as string) ?? session.user.name
         session.user.address = (token.address as string | null) ?? null

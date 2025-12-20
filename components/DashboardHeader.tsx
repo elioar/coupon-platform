@@ -13,6 +13,7 @@ interface DashboardHeaderProps {
   locale: string
   isMobileMenuOpen?: boolean
   onMobileMenuToggle?: () => void
+  emailVerified?: boolean
 }
 
 export default function DashboardHeader({
@@ -22,6 +23,7 @@ export default function DashboardHeader({
   locale,
   isMobileMenuOpen = false,
   onMobileMenuToggle,
+  emailVerified = false,
 }: DashboardHeaderProps) {
   const t = useTranslations("dashboard.header")
   const router = useRouter()

@@ -44,6 +44,7 @@ const profileSchema = z.object({
 const userSelect = {
   id: true,
   email: true,
+  emailVerified: true,
   name: true,
   role: true,
   membershipExpiry: true,

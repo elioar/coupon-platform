@@ -8,6 +8,7 @@ declare module "next-auth" {
       email: string
       name: string
       role: Role
+      emailVerified: boolean
       membershipExpiry: string | null
       address?: string | null
       birthDate?: string | Date | null
@@ -27,6 +28,7 @@ declare module "next-auth" {
 
   interface User {
     role: Role
+    emailVerified?: boolean
     address?: string | null
     birthDate?: Date | null
     phone?: string | null
@@ -47,6 +49,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string
     role: Role
+    emailVerified: boolean
     membershipExpiry: string | null
     address?: string | null
     birthDate?: string | null

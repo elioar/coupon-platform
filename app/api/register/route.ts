@@ -3,12 +3,15 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { Role, InviteStatus } from "@prisma/client"
+import { sendVerificationEmail } from "@/lib/email"
+import crypto from "crypto"
 
 const userSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   role: z.literal("USER"),
+  locale: z.string().optional().default("en"),
 })
 
 const businessSchema = z.object({
@@ -31,6 +34,7 @@ const businessSchema = z.object({
   businessLatitude: z.number().optional().nullable(),
   businessLongitude: z.number().optional().nullable(),
   inviterId: z.string().optional(),
+  locale: z.string().optional().default("en"),
 })
 
 const registerSchema = z.discriminatedUnion("role", [userSchema, businessSchema])
@@ -118,8 +122,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex")
+    const expiresAt = new Date()
+    expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
+
+    // Create verification token
+    await prisma.verificationToken.create({
+      data: {
+        token: verificationToken,
+        userId: user.id,
+        expiresAt,
+      },
+    })
+
+    // Send verification email
+    const locale = validatedData.locale || "en"
+    try {
+      await sendVerificationEmail(user.email, user.name, verificationToken, locale)
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError)
+      // Don't fail registration if email fails, but log it
+    }
+
     return NextResponse.json(
-      { message: "User created successfully", user },
+      { message: "User created successfully. Please check your email to verify your account.", user },
       { status: 201 }
     )
   } catch (error) {
