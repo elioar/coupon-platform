@@ -16,6 +16,13 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       where.status = status
+    } else {
+      // Exclude PENDING and REJECTED deals by default
+      // PENDING deals should be shown in community-import page
+      // REJECTED deals should not be shown in the main list
+      where.status = { 
+        notIn: ["PENDING", "REJECTED"]
+      }
     }
 
     if (category) {
@@ -33,7 +40,7 @@ export async function GET(request: NextRequest) {
     const deals = await prisma.communityDeal.findMany({
       where,
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -42,8 +49,8 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            comments: true,
-            votes: true,
+            CommunityDealComment: true,
+            CommunityDealVote: true,
           },
         },
       },
@@ -52,7 +59,13 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ deals })
+    const dealsWithUser = deals.map((deal) => ({
+      ...deal,
+      user: deal.User,
+      User: undefined,
+    }))
+
+    return NextResponse.json({ deals: dealsWithUser })
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

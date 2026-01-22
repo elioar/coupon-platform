@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
           couponCode: dealData.couponCode,
           userId: creator.id,
           expiresAt: dealData.expiresAt,
-          status: "ACTIVE",
+          status: "APPROVED",
           seedGroupId: seedGroupId,
         },
       })

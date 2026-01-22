@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         _count: {
           select: {
-            coupons: true,
+            Coupon: true,
           },
         },
       },

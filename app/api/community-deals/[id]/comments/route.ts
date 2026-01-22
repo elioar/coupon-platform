@@ -18,12 +18,12 @@ export async function GET(
     const comments = await prisma.communityDealComment.findMany({
       where: { dealId, parentCommentId: null },
       include: {
-        user: {
+        User: {
           select: { id: true, name: true },
         },
-        replies: {
+        other_CommunityDealComment: {
           include: {
-            user: {
+            User: {
               select: { id: true, name: true },
             },
           },
@@ -33,7 +33,19 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json({ comments }, { status: 200 })
+    const commentsWithUser = comments.map((comment) => ({
+      ...comment,
+      user: comment.User,
+      User: undefined,
+      replies: comment.other_CommunityDealComment.map((reply) => ({
+        ...reply,
+        user: reply.User,
+        User: undefined,
+      })),
+      other_CommunityDealComment: undefined,
+    }))
+
+    return NextResponse.json({ comments: commentsWithUser }, { status: 200 })
   } catch (error) {
     console.error("Error fetching community deal comments:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -66,17 +78,24 @@ export async function POST(
 
     const comment = await prisma.communityDealComment.create({
       data: {
+        id: crypto.randomUUID(),
         dealId,
         userId: user.id,
         text: validated.text,
         parentCommentId: validated.parentCommentId || null,
       },
       include: {
-        user: { select: { id: true, name: true } },
+        User: { select: { id: true, name: true } },
       },
     })
 
-    return NextResponse.json({ comment }, { status: 201 })
+    const commentWithUser = {
+      ...comment,
+      user: comment.User,
+      User: undefined,
+    }
+
+    return NextResponse.json({ comment: commentWithUser }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -141,9 +141,8 @@ export default function CreateDealModal({ isOpen, onClose, onSuccess, locale }: 
       newErrors.imageUrl = t("validation.imageRequired")
     }
 
-    if (!formData.expiresAt) {
-      newErrors.expiresAt = t("validation.expiresAtRequired")
-    } else {
+    // expiresAt is optional, but if provided, must be in the future
+    if (formData.expiresAt) {
       const expiresAt = new Date(formData.expiresAt)
       if (expiresAt <= new Date()) {
         newErrors.expiresAt = t("validation.expiresAtFuture")
@@ -171,7 +170,7 @@ export default function CreateDealModal({ isOpen, onClose, onSuccess, locale }: 
         },
         body: JSON.stringify({
           ...formData,
-          expiresAt: new Date(formData.expiresAt).toISOString(),
+          expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
         }),
       })
 

@@ -69,8 +69,14 @@ export async function POST(
     // Update if switching, else create
     await prisma.communityDealVote.upsert({
       where: { dealId_userId: { dealId, userId: user.id } },
-      update: { value: nextValue },
-      create: { dealId, userId: user.id, value: nextValue },
+      update: { value: nextValue, updatedAt: new Date() },
+      create: { 
+        id: crypto.randomUUID(),
+        dealId, 
+        userId: user.id, 
+        value: nextValue,
+        updatedAt: new Date(),
+      },
     })
 
     const counts = await getCounts(dealId)

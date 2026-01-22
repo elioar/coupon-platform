@@ -3,17 +3,30 @@ import { prisma } from "@/lib/prisma"
 import { getCurrentUser, requireAuth } from "@/lib/auth-helpers"
 import { z } from "zod"
 import { CommunityDealStatus } from "@prisma/client"
+import crypto from "crypto"
 
 const createCommunityDealSchema = z.object({
   title: z.string().min(3).max(200),
   description: z.string().min(10),
   category: z.string().min(1),
-  location: z.string().min(1),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  location: z.string().optional().default(""),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   imageUrl: z.string().url(),
-  couponCode: z.string().optional(),
-  expiresAt: z.string().datetime(),
+  couponCode: z.preprocess((val) => (val === "" ? null : val), z.string().optional().nullable()),
+  expiresAt: z.preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.string().datetime().optional().nullable()),
+  link: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return null
+    if (typeof val === "string" && val.trim() === "") return null
+    return val
+  }, z.union([z.string().url(), z.null()]).optional().nullable()),
+  priceValue: z.preprocess((val) => (val === "" ? null : val), z.string().optional().nullable()),
+  priceType: z.preprocess((val) => (val === "" ? null : val), z.enum(["EUR", "PERCENT", "ONE_PLUS_ONE", "TWO_PLUS_ONE", "FREE", "OTHER"]).optional().nullable()),
+  merchantName: z.preprocess((val) => (val === "" ? null : val), z.string().optional().nullable()),
+  origin: z.enum(["GR", "INTERNATIONAL"]).optional().default("GR"),
+  startsAt: z.preprocess((val) => (val === "" || val === null || val === undefined ? null : val), z.string().datetime().optional().nullable()),
+  extraInfo: z.preprocess((val) => (val === "" ? null : val), z.string().optional().nullable()),
+  redeemSteps: z.preprocess((val) => (val === "" ? null : val), z.string().optional().nullable()),
 })
 
 // GET - List active community deals (public)
@@ -24,12 +37,13 @@ export async function GET(request: NextRequest) {
     const location = searchParams.get('location')
     const currentUser = await getCurrentUser()
 
-    // Build where clause - only show active, non-expired deals
+    // Build where clause - only show approved, non-expired deals
     const where: any = {
-      status: CommunityDealStatus.ACTIVE,
-      expiresAt: {
-        gt: new Date(), // Only show deals that haven't expired
-      },
+      status: CommunityDealStatus.APPROVED, // Show only approved deals
+      OR: [
+        { expiresAt: null }, // Show deals with no expiration
+        { expiresAt: { gt: new Date() } }, // Or deals that haven't expired
+      ],
     }
 
     if (category) {
@@ -46,7 +60,7 @@ export async function GET(request: NextRequest) {
     const deals = await prisma.communityDeal.findMany({
       where,
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -55,7 +69,7 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            comments: true,
+            CommunityDealComment: true,
           },
         },
       },
@@ -96,7 +110,9 @@ export async function GET(request: NextRequest) {
 
     const dealsWithCounts = deals.map((d) => ({
       ...d,
-      commentsCount: d._count.comments,
+      user: d.User,
+      User: undefined,
+      commentsCount: d._count.CommunityDealComment,
       upvotesCount: upvoteMap.get(d.id) ?? 0,
       downvotesCount: downvoteMap.get(d.id) ?? 0,
       myVote: myVoteMap.get(d.id) ?? null,
@@ -119,33 +135,49 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
 
     const body = await request.json()
+    console.log("Received body:", JSON.stringify(body, null, 2))
     const validatedData = createCommunityDealSchema.parse(body)
 
-    // Validate expiration date is in the future
-    const expiresAt = new Date(validatedData.expiresAt)
-    if (expiresAt <= new Date()) {
-      return NextResponse.json(
-        { error: "Expiration date must be in the future" },
-        { status: 400 }
-      )
+    // Validate expiration date is in the future if provided
+    let expiresAt: Date | null = null
+    if (validatedData.expiresAt) {
+      expiresAt = new Date(validatedData.expiresAt)
+      if (expiresAt <= new Date()) {
+        return NextResponse.json(
+          { error: "Expiration date must be in the future" },
+          { status: 400 }
+        )
+      }
     }
+
+    // Generate unique ID for the deal
+    const dealId = crypto.randomBytes(16).toString("hex")
 
     const deal = await prisma.communityDeal.create({
       data: {
+        id: dealId,
         title: validatedData.title,
         description: validatedData.description,
         category: validatedData.category,
-        location: validatedData.location,
-        latitude: validatedData.latitude,
-        longitude: validatedData.longitude,
+        location: validatedData.location || "",
+        latitude: validatedData.latitude ?? null,
+        longitude: validatedData.longitude ?? null,
         imageUrl: validatedData.imageUrl,
         couponCode: validatedData.couponCode || null,
         expiresAt: expiresAt,
+        link: validatedData.link || null,
+        priceValue: validatedData.priceValue || null,
+        priceType: validatedData.priceType || null,
+        merchantName: validatedData.merchantName || null,
+        origin: validatedData.origin || "GR",
+        startsAt: validatedData.startsAt ? new Date(validatedData.startsAt) : null,
+        extraInfo: validatedData.extraInfo || null,
+        redeemSteps: validatedData.redeemSteps || null,
         userId: user.id,
-        status: CommunityDealStatus.ACTIVE,
+        status: CommunityDealStatus.APPROVED, // User-submitted deals are approved by default
       },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -155,9 +187,16 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ deal }, { status: 201 })
+    const dealWithUser = {
+      ...deal,
+      user: deal.User,
+      User: undefined,
+    }
+
+    return NextResponse.json({ deal: dealWithUser }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error("Validation error details:", JSON.stringify(error.issues, null, 2))
       return NextResponse.json(
         { error: "Validation error", details: error.issues },
         { status: 400 }

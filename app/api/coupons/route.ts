@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
       where,
       take,
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -151,14 +151,22 @@ export async function GET(request: NextRequest) {
             businessLongitude: true,
           },
         },
-        category: true,
+        Category: true,
       },
       orderBy: {
         createdAt: 'desc',
       },
     })
 
-    return NextResponse.json({ coupons })
+    const couponsWithBusiness = coupons.map((coupon) => ({
+      ...coupon,
+      business: coupon.User,
+      category: coupon.Category,
+      User: undefined,
+      Category: undefined,
+    }))
+
+    return NextResponse.json({ coupons: couponsWithBusiness })
   } catch (error) {
     console.error("Error fetching coupons:", error)
     return NextResponse.json(

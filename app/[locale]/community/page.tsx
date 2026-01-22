@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Navigation from "@/components/Navigation"
 import CommunityDealCard from "@/components/CommunityDealCard"
 import SkeletonCommunityDealCard from "@/components/SkeletonCommunityDealCard"
-import CreateDealModal from "@/components/CreateDealModal"
+import { EditDealModal } from "@/components/EditDealModal"
 import CommunityDealModal from "@/components/CommunityDealModal"
 
 interface CommunityDeal {
@@ -16,13 +16,21 @@ interface CommunityDeal {
   title: string
   description: string
   category: string
-  location: string
+  location: string | null
   latitude?: number | null
   longitude?: number | null
   imageUrl: string
   couponCode: string | null
   createdAt: string
-  expiresAt: string
+  expiresAt: string | null
+  startsAt?: string | null
+  link?: string | null
+  priceValue?: string | null
+  priceType?: "EUR" | "PERCENT" | "ONE_PLUS_ONE" | "TWO_PLUS_ONE" | "FREE" | "OTHER" | null
+  merchantName?: string | null
+  origin?: "GR" | "INTERNATIONAL" | null
+  extraInfo?: string | null
+  redeemSteps?: string | null
   commentsCount: number
   upvotesCount: number
   downvotesCount: number
@@ -55,6 +63,7 @@ export default function CommunityPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<CommunityDeal | null>(null)
+  const [creating, setCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(getInitialPage)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -326,7 +335,73 @@ export default function CommunityPage() {
   }, [selectedCategory])
 
   const handleCreateSuccess = () => {
+    setIsCreateModalOpen(false)
     fetchDeals()
+  }
+
+  const handleCreateDeal = async (formData: any) => {
+    setCreating(true)
+    try {
+      const response = await fetch("/api/community-deals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          location: formData.location,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          imageUrl: formData.imageUrl,
+          couponCode: formData.couponCode || null,
+          expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
+          link: formData.link?.trim() || null,
+          priceValue: formData.priceValue?.trim() || null,
+          priceType: formData.priceType || null,
+          merchantName: formData.merchantName?.trim() || null,
+          origin: formData.origin || "GR",
+          startsAt: formData.startsAt ? new Date(formData.startsAt).toISOString() : null,
+          extraInfo: formData.extraInfo?.trim() || null,
+          redeemSteps: formData.redeemSteps?.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || "Failed to create deal"
+        const errorDetails = errorData.details ? ` Details: ${JSON.stringify(errorData.details)}` : ""
+        console.error("Validation error details:", errorData.details)
+        throw new Error(errorMessage + errorDetails)
+      }
+
+      handleCreateSuccess()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create deal"
+      console.error("Error creating deal:", errorMessage)
+      throw error
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleImageUpload = async (file: File): Promise<string> => {
+    const uploadFormData = new FormData()
+    uploadFormData.append("file", file)
+
+    const response = await fetch("/api/upload/community", {
+      method: "POST",
+      body: uploadFormData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || "Upload failed")
+    }
+
+    const data = await response.json()
+    return data.url
   }
 
   const handleViewDeal = (deal: CommunityDeal) => {
@@ -417,7 +492,7 @@ export default function CommunityPage() {
     return (
       deal.title.toLowerCase().includes(query) ||
       deal.description.toLowerCase().includes(query) ||
-      deal.location.toLowerCase().includes(query) ||
+      (deal.location && deal.location.toLowerCase().includes(query)) ||
       deal.category.toLowerCase().includes(query) ||
       deal.user.name.toLowerCase().includes(query)
     )
@@ -792,11 +867,15 @@ export default function CommunityPage() {
       </main>
 
       {/* Create Deal Modal */}
-      <CreateDealModal
+      <EditDealModal
+        deal={null}
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={handleCreateSuccess}
+        onSave={handleCreateDeal}
+        onImageUpload={handleImageUpload}
         locale={locale}
+        onSuccess={handleCreateSuccess}
+        saving={creating}
       />
 
       {/* View Deal Modal */}

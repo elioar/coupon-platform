@@ -10,18 +10,28 @@ interface CommunityDeal {
   title: string
   description: string
   category: string
-  location: string
+  location: string | null
   latitude?: number | null
   longitude?: number | null
   imageUrl: string
   couponCode: string | null
   createdAt: string
-  expiresAt: string
+  expiresAt: string | null
+  startsAt?: string | null
+  link?: string | null
+  priceValue?: string | null
+  priceType?: "EUR" | "PERCENT" | "ONE_PLUS_ONE" | "TWO_PLUS_ONE" | "FREE" | "OTHER" | null
+  merchantName?: string | null
+  origin?: "GR" | "INTERNATIONAL" | null
+  extraInfo?: string | null
+  redeemSteps?: string | null
   commentsCount: number
   upvotesCount: number
   downvotesCount: number
   myVote: "UP" | "DOWN" | null
   distanceKm?: number | null
+  sourceType?: "USER" | "AI"
+  sourceUrl?: string | null
   user: {
     id: string
     name: string
@@ -51,7 +61,8 @@ const formatDate = (dateString: string, locale: string) => {
   }).format(date)
 }
 
-const formatLocation = (location: string) => {
+const formatLocation = (location: string | null) => {
+  if (!location) return ""
   const words = location.trim().split(/\s+/)
   return words.slice(0, 2).join(" ")
 }
@@ -162,28 +173,30 @@ export default function CommunityDealCard({
           {deal.title}
         </h3>
 
-        <div className="mb-3 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="truncate">
-            {formatLocation(deal.location)}
-            {distanceLabel ? (
-              <span className="ml-2 text-xs font-semibold text-zinc-500 dark:text-zinc-500">
-                • {distanceLabel}
-              </span>
-            ) : null}
-          </span>
-        </div>
+        {deal.location && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="truncate">
+              {formatLocation(deal.location)}
+              {distanceLabel ? (
+                <span className="ml-2 text-xs font-semibold text-zinc-500 dark:text-zinc-500">
+                  • {distanceLabel}
+                </span>
+              ) : null}
+            </span>
+          </div>
+        )}
 
         <div className="mb-3 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-500">
           <svg

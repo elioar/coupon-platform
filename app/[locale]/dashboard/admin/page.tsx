@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
 import { useParams, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import DashboardSidebar from "@/components/DashboardSidebar"
 import DashboardHeader from "@/components/DashboardHeader"
 import Button from "@/components/Button"
+import { EditDealModal } from "@/components/EditDealModal"
 // Removed date-fns dependency
 
 interface Coupon {
@@ -213,20 +215,9 @@ export default function AdminDashboard() {
   const [loadingCommunityDeals, setLoadingCommunityDeals] = useState(false)
   const [editingDealId, setEditingDealId] = useState<string | null>(null)
   const [deletingDealId, setDeletingDealId] = useState<string | null>(null)
-  const [dealForm, setDealForm] = useState({
-    title: "",
-    description: "",
-    category: "",
-    location: "",
-    latitude: null as number | null,
-    longitude: null as number | null,
-    couponCode: "",
-    expiresAt: "",
-    status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "REPORTED",
-  })
   const [submittingDeal, setSubmittingDeal] = useState(false)
   const [dealSearchQuery, setDealSearchQuery] = useState("")
-  const [dealStatusFilter, setDealStatusFilter] = useState<"ALL" | "ACTIVE" | "EXPIRED" | "REPORTED">("ALL")
+  const [dealStatusFilter, setDealStatusFilter] = useState<"ALL" | "APPROVED" | "EXPIRED" | "REPORTED">("ALL")
   const [dealCategoryFilter, setDealCategoryFilter] = useState<string>("ALL")
 
   useEffect(() => {
@@ -321,33 +312,64 @@ export default function AdminDashboard() {
 
   const handleEditDeal = async (deal: any) => {
     setEditingDealId(deal.id)
-    setDealForm({
-      title: deal.title,
-      description: deal.description,
-      category: deal.category,
-      location: deal.location,
-      latitude: deal.latitude,
-      longitude: deal.longitude,
-      couponCode: deal.couponCode || "",
-      expiresAt: deal.expiresAt ? new Date(deal.expiresAt).toISOString().split("T")[0] : "",
-      status: deal.status,
-    })
   }
 
-  const handleSaveDeal = async () => {
+  const handleImageUpload = async (file: File): Promise<string> => {
+    const uploadFormData = new FormData()
+    uploadFormData.append("file", file)
+
+    const response = await fetch("/api/upload/community", {
+      method: "POST",
+      body: uploadFormData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || "Upload failed")
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
+  const handleSaveDeal = async (formData: any) => {
     if (!editingDealId) return
 
     setSubmittingDeal(true)
     try {
+      const payload: any = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        location: formData.location || "",
+        status: formData.status,
+        couponCode: formData.couponCode || null,
+        imageUrl: formData.imageUrl,
+        link: formData.link?.trim() || null,
+        priceValue: formData.priceValue?.trim() || null,
+        priceType: formData.priceType || null,
+        merchantName: formData.merchantName?.trim() || null,
+        origin: formData.origin || "GR",
+        extraInfo: formData.extraInfo?.trim() || null,
+        redeemSteps: formData.redeemSteps?.trim() || null,
+        latitude: formData.latitude || null,
+        longitude: formData.longitude || null,
+      }
+
+      // Handle dates - only include if they exist
+      if (formData.expiresAt) {
+        payload.expiresAt = new Date(formData.expiresAt).toISOString()
+      }
+      if (formData.startsAt) {
+        payload.startsAt = new Date(formData.startsAt).toISOString()
+      }
+
       const response = await fetch(`/api/admin/community-deals/${editingDealId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...dealForm,
-          expiresAt: dealForm.expiresAt ? new Date(dealForm.expiresAt).toISOString() : undefined,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -2104,9 +2126,20 @@ export default function AdminDashboard() {
           {/* Community Deals Section */}
           {section === "community-deals" && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">Community Deals</h1>
-                <p className="mt-2 text-zinc-600 dark:text-zinc-400">Manage community deals, edit or delete them</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">Community Deals</h1>
+                  <p className="mt-2 text-zinc-600 dark:text-zinc-400">Manage community deals, edit or delete them</p>
+                </div>
+                <a
+                  href={`/${locale}/dashboard/admin/community-import`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  AI Import
+                </a>
               </div>
 
               {/* Filters */}
@@ -2130,7 +2163,7 @@ export default function AdminDashboard() {
                     className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                   >
                     <option value="ALL">All Status</option>
-                    <option value="ACTIVE">Active</option>
+                    <option value="APPROVED">Approved</option>
                     <option value="EXPIRED">Expired</option>
                     <option value="REPORTED">Reported</option>
                   </select>
@@ -2193,9 +2226,11 @@ export default function AdminDashboard() {
                             <td className="px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">{deal.user.name}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                deal.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                                deal.status === "APPROVED" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
                                 deal.status === "EXPIRED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                                "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                deal.status === "REPORTED" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                deal.status === "PENDING" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                                "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
                               }`}>
                                 {deal.status}
                               </span>
@@ -2229,141 +2264,14 @@ export default function AdminDashboard() {
               )}
 
               {/* Edit Modal */}
-              {editingDealId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                  <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-2xl">
-                    <div className="sticky top-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Edit Deal</h2>
-                        <button
-                          onClick={() => setEditingDealId(null)}
-                          className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Title</label>
-                        <input
-                          type="text"
-                          value={dealForm.title}
-                          onChange={(e) => setDealForm({ ...dealForm, title: e.target.value })}
-                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
-                        <textarea
-                          value={dealForm.description}
-                          onChange={(e) => setDealForm({ ...dealForm, description: e.target.value })}
-                          rows={3}
-                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Category</label>
-                          <select
-                            value={dealForm.category}
-                            onChange={(e) => setDealForm({ ...dealForm, category: e.target.value })}
-                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                          >
-                            <option value="Food & Dining">Food & Dining</option>
-                            <option value="Fashion">Fashion</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="Beauty & Health">Beauty & Health</option>
-                            <option value="Travel">Travel</option>
-                            <option value="Home & Garden">Home & Garden</option>
-                            <option value="Sports & Fitness">Sports & Fitness</option>
-                            <option value="Entertainment">Entertainment</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Status</label>
-                          <select
-                            value={dealForm.status}
-                            onChange={(e) => setDealForm({ ...dealForm, status: e.target.value as any })}
-                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                          >
-                            <option value="ACTIVE">Active</option>
-                            <option value="EXPIRED">Expired</option>
-                            <option value="REPORTED">Reported</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Location</label>
-                        <input
-                          type="text"
-                          value={dealForm.location}
-                          onChange={(e) => setDealForm({ ...dealForm, location: e.target.value })}
-                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Coupon Code</label>
-                          <input
-                            type="text"
-                            value={dealForm.couponCode}
-                            onChange={(e) => setDealForm({ ...dealForm, couponCode: e.target.value })}
-                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Latitude</label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={dealForm.latitude || ""}
-                            onChange={(e) => setDealForm({ ...dealForm, latitude: e.target.value ? parseFloat(e.target.value) : null })}
-                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Longitude</label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={dealForm.longitude || ""}
-                            onChange={(e) => setDealForm({ ...dealForm, longitude: e.target.value ? parseFloat(e.target.value) : null })}
-                            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Expires At</label>
-                        <input
-                          type="date"
-                          value={dealForm.expiresAt}
-                          onChange={(e) => setDealForm({ ...dealForm, expiresAt: e.target.value })}
-                          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                        />
-                      </div>
-                      <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                        <button
-                          onClick={() => setEditingDealId(null)}
-                          className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSaveDeal}
-                          disabled={submittingDeal}
-                          className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
-                        >
-                          {submittingDeal ? "Saving..." : "Save Changes"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <EditDealModal
+                deal={editingDealId ? communityDeals.find((d) => d.id === editingDealId) || null : null}
+                isOpen={!!editingDealId}
+                onClose={() => setEditingDealId(null)}
+                onSave={handleSaveDeal}
+                onImageUpload={handleImageUpload}
+                saving={submittingDeal}
+              />
             </div>
           )}
 

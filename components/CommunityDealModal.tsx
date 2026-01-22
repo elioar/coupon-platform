@@ -10,11 +10,19 @@ interface CommunityDeal {
   title: string
   description: string
   category: string
-  location: string
+  location: string | null
   imageUrl: string
   couponCode: string | null
   createdAt: string
-  expiresAt: string
+  expiresAt: string | null
+  startsAt?: string | null
+  link?: string | null
+  priceValue?: string | null
+  priceType?: "EUR" | "PERCENT" | "ONE_PLUS_ONE" | "TWO_PLUS_ONE" | "FREE" | "OTHER" | null
+  merchantName?: string | null
+  origin?: "GR" | "INTERNATIONAL" | null
+  extraInfo?: string | null
+  redeemSteps?: string | null
   commentsCount: number
   upvotesCount: number
   downvotesCount: number
@@ -188,7 +196,13 @@ export default function CommunityDealModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       })
-      if (!res.ok) return
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        console.error("Vote error:", res.status, errorData)
+        return
+      }
+      
       const data = await res.json()
       const nextUp = data.upvotesCount ?? 0
       const nextDown = data.downvotesCount ?? 0
@@ -221,7 +235,14 @@ export default function CommunityDealModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) return
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        console.error("Comment error:", res.status, errorData)
+        alert(errorData.error || "Failed to post comment")
+        return
+      }
+      
       const data = await res.json()
       if (data.comment) {
         // Reload all comments to get the updated structure with replies
@@ -229,13 +250,20 @@ export default function CommunityDealModal({
         if (res2.ok) {
           const data2 = await res2.json()
           setComments(data2.comments || [])
+          if (typeof onCommentsCountChange === "function") {
+            onCommentsCountChange(deal.id, data2.comments?.length || 0)
+          }
         } else {
           setComments((prev) => [data.comment, ...prev])
+          if (typeof onCommentsCountChange === "function") {
+            onCommentsCountChange(deal.id, comments.length + 1)
+          }
         }
         setNewComment("")
       }
     } catch (err) {
       console.error("Error posting comment:", err)
+      alert("Failed to post comment. Please try again.")
     } finally {
       setIsSubmittingComment(false)
     }
@@ -289,7 +317,7 @@ export default function CommunityDealModal({
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-3xl max-h-[70vh] overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900 flex flex-col"
+            className="relative w-full max-w-5xl max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900 flex flex-col"
           >
             {/* Close button */}
             <button
@@ -305,12 +333,12 @@ export default function CommunityDealModal({
             {/* Content */}
             <div className="flex flex-col md:flex-row h-full overflow-hidden">
               {/* Left Side - Image */}
-              <div className="md:w-2/5 relative h-48 md:h-auto bg-zinc-100 dark:bg-zinc-800 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800">
+              <div className="md:w-2/5 relative h-48 md:h-auto bg-zinc-100 dark:bg-zinc-800 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
                 <Image
                   src={deal.imageUrl}
                   alt={deal.title}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   priority
                 />
               </div>
@@ -327,17 +355,129 @@ export default function CommunityDealModal({
                   </h1>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
                     <span>{deal.user.name}</span>
-                    <span>•</span>
-                    <span>{deal.location}</span>
+                    {deal.location && (
+                      <>
+                        <span>•</span>
+                        <span>{deal.location}</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed text-sm">
+                  <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed text-base">
                     {deal.description}
                   </p>
                 </div>
+
+                {/* Offer Link */}
+                {deal.link && (
+                  <div>
+                    <a
+                      href={deal.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 text-sm font-medium transition-colors"
+                    >
+                      <span>{locale === "el" ? "Δες προσφορά" : "View Offer"}</span>
+                      <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                )}
+
+                {/* Price & Merchant Info */}
+                {(deal.priceValue || deal.priceType || deal.merchantName) && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-2">
+                    {deal.priceValue && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          {locale === "el" ? "Τιμή" : "Price"}:
+                        </span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                          {deal.priceValue}
+                          {deal.priceType === "EUR" && " €"}
+                          {deal.priceType === "PERCENT" && "%"}
+                          {deal.priceType === "ONE_PLUS_ONE" && " (1+1)"}
+                          {deal.priceType === "TWO_PLUS_ONE" && " (2+1)"}
+                          {deal.priceType === "FREE" && (locale === "el" ? " Δωρεάν" : " Free")}
+                        </span>
+                      </div>
+                    )}
+                    {deal.merchantName && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          {locale === "el" ? "Κατάστημα" : "Merchant"}:
+                        </span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                          {deal.merchantName}
+                        </span>
+                      </div>
+                    )}
+                    {deal.origin && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          {locale === "el" ? "Προέλευση" : "Origin"}:
+                        </span>
+                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {deal.origin === "GR" ? (locale === "el" ? "Ελλάδα" : "Greece") : (locale === "el" ? "Εξωτερικό" : "International")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dates */}
+                {(deal.startsAt || deal.expiresAt) && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 space-y-2">
+                    {deal.startsAt && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          {locale === "el" ? "Έναρξη" : "Starts"}:
+                        </span>
+                        <span className="text-zinc-700 dark:text-zinc-300">
+                          {formatDate(deal.startsAt, locale)}
+                        </span>
+                      </div>
+                    )}
+                    {deal.expiresAt && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          {locale === "el" ? "Λήξη" : "Expires"}:
+                        </span>
+                        <span className="text-zinc-700 dark:text-zinc-300">
+                          {formatDate(deal.expiresAt, locale)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Extra Info */}
+                {deal.extraInfo && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+                    <div className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      {locale === "el" ? "Επιπλέον Πληροφορίες" : "Additional Info"}
+                    </div>
+                    <p className="text-base text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
+                      {deal.extraInfo}
+                    </p>
+                  </div>
+                )}
+
+                {/* Redeem Steps */}
+                {deal.redeemSteps && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+                    <div className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      {locale === "el" ? "Πώς να αποκτήσεις" : "How to Redeem"}
+                    </div>
+                    <p className="text-base text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
+                      {deal.redeemSteps}
+                    </p>
+                  </div>
+                )}
 
                 {/* Coupon Code */}
                 {deal.couponCode && (

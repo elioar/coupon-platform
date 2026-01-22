@@ -33,7 +33,11 @@ async function getOrCreateSettings() {
   return prisma.siteSettings.upsert({
     where: { id: SETTINGS_ID },
     update: {},
-    create: { id: SETTINGS_ID, ...DEFAULT_SETTINGS },
+    create: { 
+      id: SETTINGS_ID, 
+      ...DEFAULT_SETTINGS,
+      updatedAt: new Date(),
+    },
   })
 }
 
@@ -92,7 +96,12 @@ export async function PUT(request: NextRequest) {
     const settings = await prisma.siteSettings.upsert({
       where: { id: SETTINGS_ID },
       update: updates,
-      create: { id: SETTINGS_ID, ...DEFAULT_SETTINGS, ...updates },
+      create: { 
+        id: SETTINGS_ID, 
+        ...DEFAULT_SETTINGS, 
+        ...updates,
+        updatedAt: new Date(),
+      },
     })
 
     return NextResponse.json({ settings })

@@ -13,21 +13,29 @@ export async function GET(request: NextRequest) {
         status: CouponStatus.PENDING,
       },
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
             email: true,
           },
         },
-        category: true,
+        Category: true,
       },
       orderBy: {
         createdAt: 'asc',
       },
     })
 
-    return NextResponse.json({ coupons })
+    const couponsWithBusiness = coupons.map((coupon) => ({
+      ...coupon,
+      business: coupon.User,
+      category: coupon.Category,
+      User: undefined,
+      Category: undefined,
+    }))
+
+    return NextResponse.json({ coupons: couponsWithBusiness })
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

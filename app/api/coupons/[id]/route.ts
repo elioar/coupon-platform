@@ -82,14 +82,14 @@ export async function GET(
     const coupon = await prisma.coupon.findUnique({
       where: { id },
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
             email: true,
           },
         },
-        category: true,
+        Category: true,
       },
     })
 
@@ -97,7 +97,15 @@ export async function GET(
       return NextResponse.json({ error: "Coupon not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ coupon })
+    const couponWithBusiness = {
+      ...coupon,
+      business: coupon.User,
+      category: coupon.Category,
+      User: undefined,
+      Category: undefined,
+    }
+
+    return NextResponse.json({ coupon: couponWithBusiness })
   } catch (error) {
     console.error("Error fetching coupon:", error)
     return NextResponse.json(
@@ -199,19 +207,27 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
           },
         },
-        category: true,
+        Category: true,
       },
     })
 
+    const couponWithBusiness = {
+      ...updatedCoupon,
+      business: updatedCoupon.User,
+      category: updatedCoupon.Category,
+      User: undefined,
+      Category: undefined,
+    }
+
     return NextResponse.json({
       message: "Coupon updated successfully",
-      coupon: updatedCoupon,
+      coupon: couponWithBusiness,
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

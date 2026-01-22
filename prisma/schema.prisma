@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,10 +7,253 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  USER
-  BUSINESS
+model BusinessInvite {
+  id                                          String       @id
+  inviterId                                   String
+  invitedBusinessId                           String
+  status                                      InviteStatus @default(PENDING)
+  rewardGranted                               Boolean      @default(false)
+  createdAt                                   DateTime     @default(now())
+  updatedAt                                   DateTime
+  User_BusinessInvite_invitedBusinessIdToUser User         @relation("BusinessInvite_invitedBusinessIdToUser", fields: [invitedBusinessId], references: [id], onDelete: Cascade)
+  User_BusinessInvite_inviterIdToUser         User         @relation("BusinessInvite_inviterIdToUser", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([inviterId, invitedBusinessId])
+  @@index([invitedBusinessId])
+  @@index([inviterId])
+  @@index([status])
+}
+
+model Category {
+  id        String   @id
+  nameEn    String   @unique
+  nameEl    String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  Coupon    Coupon[]
+
+  @@index([slug])
+}
+
+model CommunityDeal {
+  id                   String                 @id
+  title                String
+  description          String
+  category             String
+  location             String
+  imageUrl             String
+  userId               String
+  createdAt            DateTime               @default(now())
+  expiresAt            DateTime?
+  status               CommunityDealStatus    @default(APPROVED)
+  couponCode           String?
+  latitude             Float?
+  longitude            Float?
+  seedGroupId          String?
+  sourceType           DealSourceType         @default(USER)
+  sourceUrl            String?
+  link                 String?
+  priceValue           String?
+  priceType            DealPriceType?
+  merchantName         String?
+  origin               DealOrigin?            @default(GR)
+  startsAt             DateTime?
+  extraInfo            String?
+  redeemSteps          String?
+  User                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CommunityDealComment CommunityDealComment[]
+  CommunityDealVote    CommunityDealVote[]
+
+  @@index([category])
+  @@index([expiresAt])
+  @@index([latitude, longitude])
+  @@index([seedGroupId])
+  @@index([sourceType])
+  @@index([status])
+  @@index([userId])
+}
+
+model CommunityDealComment {
+  id                         String                 @id
+  dealId                     String
+  userId                     String
+  text                       String                 @db.VarChar(100)
+  createdAt                  DateTime               @default(now())
+  parentCommentId            String?
+  CommunityDeal              CommunityDeal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  CommunityDealComment       CommunityDealComment?  @relation("CommunityDealCommentToCommunityDealComment", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  other_CommunityDealComment CommunityDealComment[] @relation("CommunityDealCommentToCommunityDealComment")
+  User                       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([dealId])
+  @@index([parentCommentId])
+  @@index([userId])
+}
+
+model CommunityDealVote {
+  id            String        @id
+  dealId        String
+  userId        String
+  value         Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  CommunityDeal CommunityDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  User          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, userId])
+  @@index([dealId])
+  @@index([userId])
+  @@index([value])
+}
+
+model Coupon {
+  id                  String             @id
+  businessId          String
+  categoryId          String
+  title               String
+  description         String
+  code                String?
+  imagePath           String?
+  discountPercentage  Int?
+  expirationDate      DateTime
+  status              CouponStatus       @default(PENDING)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime
+  couponType          CouponType         @default(ONLINE_CODE)
+  hasTimeRestrictions Boolean            @default(false)
+  maxUsesPerUser      Int?
+  usageLimitType      UsageLimitType     @default(SINGLE_USE)
+  validDays           Int[]              @default([])
+  validEndHour        Int?
+  validStartHour      Int?
+  discountAmount      Float?
+  discountType        DiscountType       @default(PERCENT)
+  User                User               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  Category            Category           @relation(fields: [categoryId], references: [id])
+  CouponAnalytics     CouponAnalytics[]
+  CouponRedemption    CouponRedemption[]
+
+  @@index([businessId])
+  @@index([categoryId])
+  @@index([expirationDate])
+  @@index([status])
+}
+
+model CouponAnalytics {
+  id        String   @id
+  couponId  String
+  eventType String
+  userId    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  Coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([userId])
+}
+
+model CouponRedemption {
+  id              String    @id
+  couponId        String
+  userId          String
+  redemptionToken String    @unique
+  redeemedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  Coupon          Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([couponId, userId])
+  @@index([redeemedAt])
+  @@index([redemptionToken])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([token])
+  @@index([userId])
+}
+
+model SiteSettings {
+  id                  String   @id @default("default")
+  useRealStats        Boolean  @default(true)
+  fakeTotalCoupons    Int      @default(0)
+  fakeActiveMembers   Int      @default(0)
+  fakeTotalBusinesses Int      @default(0)
+  fakeTotalSavings    Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+}
+
+model User {
+  id                                                    String                 @id
+  email                                                 String                 @unique
+  password                                              String
+  name                                                  String
+  role                                                  Role                   @default(USER)
+  membershipExpiry                                      DateTime?
+  createdAt                                             DateTime               @default(now())
+  updatedAt                                             DateTime
+  about                                                 String?
+  address                                               String?
+  birthDate                                             DateTime?
+  businessCategories                                    String[]               @default([])
+  businessDescription                                   String?
+  businessFacebook                                      String?
+  businessInstagram                                     String?
+  businessLocation                                      String?
+  businessTikTok                                        String?
+  businessWebsite                                       String?
+  phone                                                 String?
+  businessLatitude                                      Float?
+  businessLongitude                                     Float?
+  emailVerified                                         Boolean                @default(false)
+  BusinessInvite_BusinessInvite_invitedBusinessIdToUser BusinessInvite[]       @relation("BusinessInvite_invitedBusinessIdToUser")
+  BusinessInvite_BusinessInvite_inviterIdToUser         BusinessInvite[]       @relation("BusinessInvite_inviterIdToUser")
+  CommunityDeal                                         CommunityDeal[]
+  CommunityDealComment                                  CommunityDealComment[]
+  CommunityDealVote                                     CommunityDealVote[]
+  Coupon                                                Coupon[]
+  CouponRedemption                                      CouponRedemption[]
+  PasswordResetToken                                    PasswordResetToken[]
+  VerificationToken                                     VerificationToken[]
+
+  @@index([emailVerified])
+  @@index([email])
+  @@index([role])
+}
+
+model VerificationToken {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([token])
+  @@index([userId])
+}
+
+enum CommunityDealStatus {
+  EXPIRED
+  REPORTED
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum CouponStatus {
@@ -25,21 +262,28 @@ enum CouponStatus {
   REJECTED
 }
 
-enum InviteStatus {
-  PENDING
-  REGISTERED
-  ACTIVE
-}
-
 enum CouponType {
   ONLINE_CODE
   QR_CODE
 }
 
-enum UsageLimitType {
-  SINGLE_USE
-  MULTIPLE_USE
-  UNLIMITED
+enum DealOrigin {
+  GR
+  INTERNATIONAL
+}
+
+enum DealPriceType {
+  EUR
+  PERCENT
+  ONE_PLUS_ONE
+  TWO_PLUS_ONE
+  FREE
+  OTHER
+}
+
+enum DealSourceType {
+  USER
+  AI
 }
 
 enum DiscountType {
@@ -49,254 +293,20 @@ enum DiscountType {
   BOGO_2_1
 }
 
-enum CommunityDealStatus {
+enum InviteStatus {
+  PENDING
+  REGISTERED
   ACTIVE
-  EXPIRED
-  REPORTED
 }
 
-model User {
-  id                  String    @id @default(cuid())
-  email               String    @unique
-  password            String
-  name                String
-  emailVerified       Boolean   @default(false)
-  address             String?
-  birthDate           DateTime?
-  phone               String?
-  about               String?   @db.Text
-  businessDescription String?   @db.Text
-  businessCategories  String[]  @default([])
-  businessLocation    String?
-  businessWebsite     String?
-  businessInstagram   String?
-  businessFacebook    String?
-  businessTikTok      String?
-  businessLatitude    Float?
-  businessLongitude   Float?
-  role                Role      @default(USER)
-  membershipExpiry    DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  // Relations
-  coupons           Coupon[]           @relation("BusinessCoupons")
-  couponRedemptions CouponRedemption[]
-  sentInvites       BusinessInvite[]   @relation("InviterInvites")
-  receivedInvites   BusinessInvite[]   @relation("InvitedBusiness")
-  communityDeals    CommunityDeal[]
-  communityDealComments CommunityDealComment[]
-  communityDealVotes    CommunityDealVote[]
-  verificationTokens VerificationToken[]
-  passwordResetTokens PasswordResetToken[]
-
-  @@index([email])
-  @@index([role])
-  @@index([emailVerified])
+enum Role {
+  ADMIN
+  USER
+  BUSINESS
 }
 
-model Category {
-  id        String   @id @default(cuid())
-  nameEn    String   @unique
-  nameEl    String   @unique
-  slug      String   @unique
-  createdAt DateTime @default(now())
-
-  // Relations
-  coupons Coupon[]
-
-  @@index([slug])
-}
-
-model Coupon {
-  id                  String         @id @default(cuid())
-  businessId          String
-  categoryId          String
-  title               String
-  description         String         @db.Text
-  code                String?
-  couponType          CouponType     @default(ONLINE_CODE)
-  imagePath           String?
-  discountType        DiscountType   @default(PERCENT)
-  discountPercentage  Int? // For PERCENT type
-  discountAmount      Float? // For FIXED type (in currency units)
-  expirationDate      DateTime
-  status              CouponStatus   @default(PENDING)
-  usageLimitType      UsageLimitType @default(SINGLE_USE)
-  maxUsesPerUser      Int?
-  hasTimeRestrictions Boolean        @default(false)
-  validDays           Int[]          @default([])
-  validStartHour      Int?
-  validEndHour        Int?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-
-  // Relations
-  business    User               @relation("BusinessCoupons", fields: [businessId], references: [id], onDelete: Cascade)
-  category    Category           @relation(fields: [categoryId], references: [id])
-  analytics   CouponAnalytics[]
-  redemptions CouponRedemption[]
-
-  @@index([businessId])
-  @@index([categoryId])
-  @@index([status])
-  @@index([expirationDate])
-}
-
-model CouponAnalytics {
-  id        String   @id @default(cuid())
-  couponId  String
-  eventType String // 'VIEW', 'CLICK', 'REDEMPTION'
-  userId    String? // Optional - track which user (if authenticated)
-  ipAddress String? // Optional - for anonymous tracking
-  userAgent String? // Optional - browser/device info
-  createdAt DateTime @default(now())
-
-  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
-
-  @@index([couponId])
-  @@index([eventType])
-  @@index([createdAt])
-  @@index([userId])
-}
-
-model CouponRedemption {
-  id              String    @id @default(cuid())
-  couponId        String
-  userId          String
-  redemptionToken String    @unique
-  redeemedAt      DateTime?
-  createdAt       DateTime  @default(now())
-
-  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([redemptionToken])
-  @@index([couponId])
-  @@index([userId])
-  @@index([redeemedAt])
-  @@index([couponId, userId])
-}
-
-model BusinessInvite {
-  id                String       @id @default(cuid())
-  inviterId         String
-  invitedBusinessId String
-  status            InviteStatus @default(PENDING)
-  rewardGranted     Boolean      @default(false)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-
-  // Relations
-  inviter         User @relation("InviterInvites", fields: [inviterId], references: [id], onDelete: Cascade)
-  invitedBusiness User @relation("InvitedBusiness", fields: [invitedBusinessId], references: [id], onDelete: Cascade)
-
-  @@unique([inviterId, invitedBusinessId])
-  @@index([inviterId])
-  @@index([invitedBusinessId])
-  @@index([status])
-}
-
-model SiteSettings {
-  id                 String   @id @default("default")
-  useRealStats       Boolean  @default(true)
-  fakeTotalCoupons   Int      @default(0)
-  fakeActiveMembers  Int      @default(0)
-  fakeTotalBusinesses Int     @default(0)
-  fakeTotalSavings   Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-}
-
-model CommunityDeal {
-  id          String              @id @default(cuid())
-  title       String
-  description String              @db.Text
-  category    String
-  location    String
-  latitude    Float?
-  longitude   Float?
-  imageUrl    String
-  couponCode  String?
-  userId      String
-  createdAt   DateTime            @default(now())
-  expiresAt   DateTime
-  status      CommunityDealStatus @default(ACTIVE)
-  seedGroupId String?             // Track which seed batch this deal belongs to
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments CommunityDealComment[]
-  votes    CommunityDealVote[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([expiresAt])
-  @@index([category])
-  @@index([latitude, longitude])
-  @@index([seedGroupId])
-}
-
-model CommunityDealComment {
-  id              String   @id @default(cuid())
-  dealId          String
-  userId          String
-  text            String   @db.VarChar(100)
-  parentCommentId String?
-  createdAt       DateTime @default(now())
-
-  deal           CommunityDeal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentComment  CommunityDealComment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
-  replies        CommunityDealComment[] @relation("CommentReplies")
-
-  @@index([dealId])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([parentCommentId])
-}
-
-model CommunityDealVote {
-  id        String   @id @default(cuid())
-  dealId    String
-  userId    String
-  value     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  deal CommunityDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([dealId, userId])
-  @@index([dealId])
-  @@index([userId])
-  @@index([value])
-}
-
-model VerificationToken {
-  id         String   @id @default(cuid())
-  token      String   @unique
-  userId     String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model PasswordResetToken {
-  id         String   @id @default(cuid())
-  token      String   @unique
-  userId     String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
+enum UsageLimitType {
+  SINGLE_USE
+  MULTIPLE_USE
+  UNLIMITED
 }
