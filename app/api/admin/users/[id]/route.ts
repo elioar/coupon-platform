@@ -47,7 +47,7 @@ export async function GET(
         businessTikTok: true,
         _count: {
           select: {
-            coupons: true,
+            Coupon: true,
           },
         },
       },

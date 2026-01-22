@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import crypto from "crypto"
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.couponAnalytics.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         couponId,
         eventType,
         userId: userId || null,

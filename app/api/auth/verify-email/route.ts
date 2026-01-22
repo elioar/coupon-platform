@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     // Find verification token
     const verificationToken = await prisma.verificationToken.findUnique({
       where: { token },
-      include: { user: true },
+      include: { User: true },
     })
 
     if (!verificationToken) {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email is already verified
-    if (verificationToken.user.emailVerified) {
+    if (verificationToken.User.emailVerified) {
       // Delete token since it's already used
       await prisma.verificationToken.delete({
         where: { id: verificationToken.id },

@@ -58,10 +58,12 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(validatedData.password, 10)
 
     const baseUserData = {
+      id: crypto.randomBytes(16).toString("hex"),
       email: validatedData.email,
       password: hashedPassword,
       name: validatedData.name,
       role: validatedData.role as Role,
+      updatedAt: new Date(),
     }
 
     const user = await prisma.user.create({
@@ -110,9 +112,11 @@ export async function POST(request: NextRequest) {
           // Create invite record with REGISTERED status
           await prisma.businessInvite.create({
             data: {
+              id: crypto.randomBytes(16).toString("hex"),
               inviterId: validatedData.inviterId,
               invitedBusinessId: user.id,
               status: InviteStatus.REGISTERED,
+              updatedAt: new Date(),
             },
           })
         }
@@ -130,6 +134,7 @@ export async function POST(request: NextRequest) {
     // Create verification token
     await prisma.verificationToken.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         token: verificationToken,
         userId: user.id,
         expiresAt,

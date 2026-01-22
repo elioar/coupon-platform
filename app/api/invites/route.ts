@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         inviterId: user.id,
       },
       include: {
-        invitedBusiness: {
+        User_BusinessInvite_invitedBusinessIdToUser: {
           select: {
             id: true,
             name: true,

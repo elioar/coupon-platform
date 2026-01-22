@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
 import { CouponStatus, CouponType, UsageLimitType, DiscountType } from "@prisma/client"
+import crypto from "crypto"
 
 const createCouponSchema = z.object({
   title: z.string().min(3).max(200),
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest) {
 
     // Convert empty string to undefined for optional fields
     const couponData = {
+      id: crypto.randomBytes(16).toString("hex"),
       ...validatedData,
       code: validatedData.couponType === CouponType.QR_CODE 
         ? undefined 
@@ -214,18 +216,19 @@ export async function POST(request: NextRequest) {
       businessId: user.id,
       expirationDate: new Date(validatedData.expirationDate),
       status: CouponStatus.PENDING,
+      updatedAt: new Date(),
     }
 
     const coupon = await prisma.coupon.create({
       data: couponData,
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
           },
         },
-        category: true,
+        Category: true,
       },
     })
 

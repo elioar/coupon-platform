@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Get all business coupons
     const coupons = await prisma.coupon.findMany({
       where: { businessId },
-      select: { id: true, title: true, category: true }
+      select: { id: true, title: true, Category: { select: { nameEn: true } } }
     })
     const couponIds = coupons.map(c => c.id)
 
@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
       const coupon = coupons.find(c => c.id === analytics.couponId)
       if (coupon) {
         // Use English name for consistency (can be changed based on locale if needed)
-        const categoryName = coupon.category.nameEn
+        const categoryName = coupon.Category.nameEn
         if (!categoryMap.has(categoryName)) {
           categoryMap.set(categoryName, { views: 0, clicks: 0, redemptions: 0 })
         }

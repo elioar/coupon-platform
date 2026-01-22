@@ -16,7 +16,7 @@ async function getOrCreateSettings() {
   return prisma.siteSettings.upsert({
     where: { id: SETTINGS_ID },
     update: {},
-    create: { id: SETTINGS_ID, ...DEFAULT_SETTINGS },
+    create: { id: SETTINGS_ID, ...DEFAULT_SETTINGS, updatedAt: new Date() },
   })
 }
 

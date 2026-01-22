@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth-helpers"
 import { CouponStatus, UsageLimitType } from "@prisma/client"
+import crypto from "crypto"
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,13 +21,13 @@ export async function POST(request: NextRequest) {
     const redemption = await prisma.couponRedemption.findUnique({
       where: { redemptionToken },
       include: {
-        coupon: {
+        Coupon: {
           include: {
-            business: true,
-            category: true
+            User: true,
+            Category: true
           }
         },
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check 1: Is coupon active?
-    if (redemption.coupon.status !== CouponStatus.APPROVED) {
+    if (redemption.Coupon.status !== CouponStatus.APPROVED) {
       return NextResponse.json(
         { 
           valid: false, 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (new Date(redemption.coupon.expirationDate) < new Date()) {
+    if (new Date(redemption.Coupon.expirationDate) < new Date()) {
       return NextResponse.json(
         { 
           valid: false, 
@@ -72,8 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check 2: Does user have subscription?
-    if (!redemption.user.membershipExpiry || 
-        new Date(redemption.user.membershipExpiry) <= new Date()) {
+    if (!redemption.User.membershipExpiry || 
+        new Date(redemption.User.membershipExpiry) <= new Date()) {
       return NextResponse.json(
         { 
           valid: false, 
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check 4: Usage limits
-    if (redemption.coupon.usageLimitType === UsageLimitType.SINGLE_USE) {
+    if (redemption.Coupon.usageLimitType === UsageLimitType.SINGLE_USE) {
       // For SINGLE_USE, check if user has already redeemed ANY redemption for this coupon
       const existingRedeemed = await prisma.couponRedemption.findFirst({
         where: {
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-    } else if (redemption.coupon.usageLimitType === UsageLimitType.MULTIPLE_USE) {
+    } else if (redemption.Coupon.usageLimitType === UsageLimitType.MULTIPLE_USE) {
       // Count existing redeemed redemptions for this user
       const redeemedCount = await prisma.couponRedemption.count({
         where: {
@@ -130,13 +131,13 @@ export async function POST(request: NextRequest) {
         }
       })
       
-      if (redemption.coupon.maxUsesPerUser && redeemedCount >= redemption.coupon.maxUsesPerUser) {
+      if (redemption.Coupon.maxUsesPerUser && redeemedCount >= redemption.Coupon.maxUsesPerUser) {
         return NextResponse.json(
           { 
             valid: false, 
             error: "Usage limit reached",
-            message: `Έχετε φτάσει το μέγιστο όριο χρήσεων (${redemption.coupon.maxUsesPerUser}) για αυτό το κουπόνι`,
-            messageEn: `You have reached the maximum number of uses (${redemption.coupon.maxUsesPerUser}) for this coupon`
+            message: `Έχετε φτάσει το μέγιστο όριο χρήσεων (${redemption.Coupon.maxUsesPerUser}) για αυτό το κουπόνι`,
+            messageEn: `You have reached the maximum number of uses (${redemption.Coupon.maxUsesPerUser}) for this coupon`
           },
           { status: 400 }
         )
@@ -145,13 +146,13 @@ export async function POST(request: NextRequest) {
     // For UNLIMITED, no check needed - allow redemption
 
     // Check 5: Time/day restrictions (only for QR_CODE coupons)
-    if (redemption.coupon.couponType === "QR_CODE" && redemption.coupon.hasTimeRestrictions) {
+    if (redemption.Coupon.couponType === "QR_CODE" && redemption.Coupon.hasTimeRestrictions) {
       const now = new Date()
       const currentDay = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
       const currentHour = now.getHours()
 
       // Check if current day is in validDays array
-      if (!redemption.coupon.validDays || redemption.coupon.validDays.length === 0 || !redemption.coupon.validDays.includes(currentDay)) {
+      if (!redemption.Coupon.validDays || redemption.Coupon.validDays.length === 0 || !redemption.Coupon.validDays.includes(currentDay)) {
         const dayNamesEl = ["Κυριακή", "Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο"]
         const dayNamesEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         const dayNameEl = dayNamesEl[currentDay]
@@ -168,10 +169,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if current hour is within valid range
-      if (redemption.coupon.validStartHour !== null && redemption.coupon.validEndHour !== null) {
+      if (redemption.Coupon.validStartHour !== null && redemption.Coupon.validEndHour !== null) {
         // For end hour, we check if current hour is >= endHour (not just >)
         // This means if end hour is 18:00, redemption is allowed until 17:59:59
-        if (currentHour < redemption.coupon.validStartHour || currentHour >= redemption.coupon.validEndHour) {
+        if (currentHour < redemption.Coupon.validStartHour || currentHour >= redemption.Coupon.validEndHour) {
           const formatHour = (hour: number) => {
             return hour.toString().padStart(2, '0')
           }
@@ -179,8 +180,8 @@ export async function POST(request: NextRequest) {
             { 
               valid: false, 
               error: "Invalid time for redemption",
-              message: `Το κουπόνι μπορεί να εξαργυρωθεί μόνο μεταξύ ${formatHour(redemption.coupon.validStartHour)}:00 - ${formatHour(redemption.coupon.validEndHour)}:00`,
-              messageEn: `This coupon can only be redeemed between ${formatHour(redemption.coupon.validStartHour)}:00 - ${formatHour(redemption.coupon.validEndHour)}:00`
+              message: `Το κουπόνι μπορεί να εξαργυρωθεί μόνο μεταξύ ${formatHour(redemption.Coupon.validStartHour)}:00 - ${formatHour(redemption.Coupon.validEndHour)}:00`,
+              messageEn: `This coupon can only be redeemed between ${formatHour(redemption.Coupon.validStartHour)}:00 - ${formatHour(redemption.Coupon.validEndHour)}:00`
             },
             { status: 400 }
           )
@@ -199,6 +200,7 @@ export async function POST(request: NextRequest) {
     // Track analytics
     await prisma.couponAnalytics.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         couponId: redemption.couponId,
         eventType: "REDEMPTION",
         userId: redemption.userId
@@ -207,31 +209,31 @@ export async function POST(request: NextRequest) {
 
     // Format discount message based on type
     let discountMessage = ""
-    if (redemption.coupon.discountType === "PERCENT") {
-      discountMessage = `Έκπτωση ${redemption.coupon.discountPercentage || 0}% ενεργή 🎉`
-    } else if (redemption.coupon.discountType === "FIXED") {
-      discountMessage = `Έκπτωση -€${(redemption.coupon.discountAmount || 0).toFixed(2)} ενεργή 🎉`
-    } else if (redemption.coupon.discountType === "BOGO_1_1") {
+    if (redemption.Coupon.discountType === "PERCENT") {
+      discountMessage = `Έκπτωση ${redemption.Coupon.discountPercentage || 0}% ενεργή 🎉`
+    } else if (redemption.Coupon.discountType === "FIXED") {
+      discountMessage = `Έκπτωση -€${(redemption.Coupon.discountAmount || 0).toFixed(2)} ενεργή 🎉`
+    } else if (redemption.Coupon.discountType === "BOGO_1_1") {
       discountMessage = "Buy 1 Get 1 ενεργό 🎉"
-    } else if (redemption.coupon.discountType === "BOGO_2_1") {
+    } else if (redemption.Coupon.discountType === "BOGO_2_1") {
       discountMessage = "Buy 2 Get 1 ενεργό 🎉"
     } else {
-      discountMessage = `Έκπτωση ${redemption.coupon.discountPercentage || 0}% ενεργή 🎉`
+      discountMessage = `Έκπτωση ${redemption.Coupon.discountPercentage || 0}% ενεργή 🎉`
     }
 
     return NextResponse.json({
       valid: true,
       message: discountMessage,
       coupon: {
-        id: redemption.coupon.id,
-        title: redemption.coupon.title,
-        discountType: redemption.coupon.discountType,
-        discountPercentage: redemption.coupon.discountPercentage,
-        discountAmount: redemption.coupon.discountAmount
+        id: redemption.Coupon.id,
+        title: redemption.Coupon.title,
+        discountType: redemption.Coupon.discountType,
+        discountPercentage: redemption.Coupon.discountPercentage,
+        discountAmount: redemption.Coupon.discountAmount
       },
       user: {
-        name: redemption.user.name,
-        email: redemption.user.email
+        name: redemption.User.name,
+        email: redemption.User.email
       },
       redeemedAt: updatedRedemption.redeemedAt
     })

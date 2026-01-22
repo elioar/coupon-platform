@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         id: true,
         email: true,
         membershipExpiry: true,
-        sentInvites: {
+        BusinessInvite_BusinessInvite_inviterIdToUser: {
           where: {
             rewardGranted: true,
             status: "ACTIVE",
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date()
     const hasActiveMembership = dbUser.membershipExpiry && new Date(dbUser.membershipExpiry) > now
-    const rewardsGranted = dbUser.sentInvites.length
+    const rewardsGranted = dbUser.BusinessInvite_BusinessInvite_inviterIdToUser.length
 
     // ALWAYS try to fix if user has rewards granted, regardless of current membership status
     // This ensures we grant the full amount even if they have partial membership

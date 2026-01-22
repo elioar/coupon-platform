@@ -31,7 +31,7 @@ export async function checkAndActivateInvites(businessId: string): Promise<void>
       rewardGranted: false,
     },
     include: {
-      inviter: {
+      User_BusinessInvite_inviterIdToUser: {
         select: {
           id: true,
           membershipExpiry: true,
@@ -54,9 +54,9 @@ export async function checkAndActivateInvites(businessId: string): Promise<void>
       const now = new Date()
       let newExpiry: Date
 
-      if (invite.inviter.membershipExpiry && invite.inviter.membershipExpiry > now) {
+      if (invite.User_BusinessInvite_inviterIdToUser.membershipExpiry && invite.User_BusinessInvite_inviterIdToUser.membershipExpiry > now) {
         // User already has active membership, add 1 month to existing expiry
-        newExpiry = new Date(invite.inviter.membershipExpiry)
+        newExpiry = new Date(invite.User_BusinessInvite_inviterIdToUser.membershipExpiry)
         newExpiry.setMonth(newExpiry.getMonth() + 1)
       } else {
         // User has no active membership, set expiry to 1 month from now
@@ -106,7 +106,7 @@ export async function fixMissingMembershipRewards(userId?: string): Promise<numb
         status: InviteStatus.ACTIVE,
       },
       include: {
-        inviter: {
+        User_BusinessInvite_inviterIdToUser: {
           select: {
             id: true,
             membershipExpiry: true,
@@ -119,7 +119,7 @@ export async function fixMissingMembershipRewards(userId?: string): Promise<numb
       return 0
     }
 
-    const user = userInvites[0].inviter
+    const user = userInvites[0].User_BusinessInvite_inviterIdToUser
     const now = new Date()
     const hasActiveMembership = user.membershipExpiry && new Date(user.membershipExpiry) > now
 
@@ -155,13 +155,13 @@ export async function fixMissingMembershipRewards(userId?: string): Promise<numb
       status: InviteStatus.ACTIVE,
     },
     include: {
-      inviter: {
+      User_BusinessInvite_inviterIdToUser: {
         select: {
           id: true,
           membershipExpiry: true,
         },
       },
-      invitedBusiness: {
+      User_BusinessInvite_invitedBusinessIdToUser: {
         select: {
           id: true,
         },
@@ -184,7 +184,7 @@ export async function fixMissingMembershipRewards(userId?: string): Promise<numb
 
   // Process each user
   for (const [inviterUserId, invites] of invitesByUser.entries()) {
-    const user = invites[0].inviter
+    const user = invites[0].User_BusinessInvite_inviterIdToUser
     const hasActiveMembership = user.membershipExpiry && new Date(user.membershipExpiry) > now
 
 

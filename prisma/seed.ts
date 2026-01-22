@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -13,6 +14,7 @@ async function main() {
       where: { slug: 'electronics' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Electronics',
         nameEl: 'Ηλεκτρονικά',
         slug: 'electronics',
@@ -22,6 +24,7 @@ async function main() {
       where: { slug: 'fashion' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Fashion',
         nameEl: 'Μόδα',
         slug: 'fashion',
@@ -31,6 +34,7 @@ async function main() {
       where: { slug: 'food' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Food & Dining',
         nameEl: 'Φαγητό & Εστιατόρια',
         slug: 'food',
@@ -40,6 +44,7 @@ async function main() {
       where: { slug: 'travel' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Travel',
         nameEl: 'Ταξίδια',
         slug: 'travel',
@@ -49,6 +54,7 @@ async function main() {
       where: { slug: 'beauty' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Beauty & Health',
         nameEl: 'Ομορφιά & Υγεία',
         slug: 'beauty',
@@ -58,6 +64,7 @@ async function main() {
       where: { slug: 'home' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Home & Garden',
         nameEl: 'Σπίτι & Κήπος',
         slug: 'home',
@@ -67,6 +74,7 @@ async function main() {
       where: { slug: 'sports' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Sports & Fitness',
         nameEl: 'Αθλητισμός & Γυμναστική',
         slug: 'sports',
@@ -76,6 +84,7 @@ async function main() {
       where: { slug: 'entertainment' },
       update: {},
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         nameEn: 'Entertainment',
         nameEl: 'Ψυχαγωγία',
         slug: 'entertainment',
@@ -92,10 +101,12 @@ async function main() {
     where: { email: 'admin@vibepeek.com' },
     update: {},
     create: {
+      id: crypto.randomBytes(16).toString("hex"),
       email: 'admin@vibepeek.com',
       password: adminPassword,
       name: 'Admin User',
       role: 'ADMIN',
+      updatedAt: new Date(),
     },
   })
   console.log('✅ Admin user created (email: admin@vibepeek.com, password: admin123)')
@@ -125,10 +136,12 @@ async function main() {
         businessTikTok: 'https://tiktok.com/@techstore_gr',
       },
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         email: 'techstore@example.com',
         password: businessPassword,
         name: 'TechStore',
         role: 'BUSINESS',
+        updatedAt: new Date(),
         phone: '+30 210 1234567',
         address: '123 Tech Avenue',
         businessDescription: JSON.stringify({
@@ -165,10 +178,12 @@ async function main() {
         businessTikTok: 'https://tiktok.com/@fashionhub_gr',
       },
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         email: 'fashionhub@example.com',
         password: businessPassword,
         name: 'Fashion Hub',
         role: 'BUSINESS',
+        updatedAt: new Date(),
         phone: '+30 210 2345678',
         address: '456 Fashion Street',
         businessDescription: JSON.stringify({
@@ -205,10 +220,12 @@ async function main() {
         businessTikTok: 'https://tiktok.com/@foodcorner_gr',
       },
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         email: 'foodcorner@example.com',
         password: businessPassword,
         name: 'Food Corner',
         role: 'BUSINESS',
+        updatedAt: new Date(),
         phone: '+30 210 3456789',
         address: '789 Culinary Boulevard',
         businessDescription: JSON.stringify({
@@ -245,10 +262,12 @@ async function main() {
         businessTikTok: 'https://tiktok.com/@travelpro_gr',
       },
       create: {
+        id: crypto.randomBytes(16).toString("hex"),
         email: 'travelpro@example.com',
         password: businessPassword,
         name: 'Travel Pro',
         role: 'BUSINESS',
+        updatedAt: new Date(),
         phone: '+30 210 4567890',
         address: '321 Travel Plaza',
         businessDescription: JSON.stringify({
@@ -290,6 +309,7 @@ async function main() {
     // Electronics coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '50% OFF on All Laptops',
         description: 'Get an amazing 50% discount on all laptop models. Latest brands including Apple, Dell, HP, and Lenovo. Limited time offer!',
         code: 'LAPTOP50',
@@ -299,10 +319,12 @@ async function main() {
         discountPercentage: 50,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '30% OFF Smartphones',
         description: 'Upgrade to the latest smartphone with 30% off. All major brands available including iPhone, Samsung, and Google Pixel.',
         code: 'PHONE30',
@@ -312,10 +334,12 @@ async function main() {
         discountPercentage: 30,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '20% OFF Gaming Accessories',
         description: 'Level up your gaming setup! Get 20% off on keyboards, mice, headsets, and more gaming accessories.',
         code: 'GAME20',
@@ -325,10 +349,12 @@ async function main() {
         discountPercentage: 20,
         expirationDate: thirtyDaysFromNow,
         status: 'PENDING',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '40% OFF Smart Watches',
         description: 'Stay connected with style! Get 40% off on premium smartwatches. Track your fitness, receive notifications, and more.',
         code: 'WATCH40',
@@ -338,10 +364,12 @@ async function main() {
         discountPercentage: 40,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '25% OFF Headphones & Audio',
         description: 'Experience premium sound quality! 25% discount on all headphones, earbuds, and audio equipment.',
         code: 'AUDIO25',
@@ -351,12 +379,14 @@ async function main() {
         discountPercentage: 25,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Fashion coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: 'Summer Sale - 40% OFF',
         description: 'Refresh your wardrobe with our summer collection! 40% discount on all clothing items. Limited stock available.',
         code: 'SUMMER40',
@@ -366,10 +396,12 @@ async function main() {
         discountPercentage: 40,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '25% OFF Designer Shoes',
         description: 'Step in style with 25% off on designer shoes. Premium brands at unbeatable prices. All sizes available.',
         code: 'SHOES25',
@@ -379,10 +411,12 @@ async function main() {
         discountPercentage: 25,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: 'Buy 2 Get 1 Free - Accessories',
         description: 'Amazing deal on fashion accessories! Buy any 2 items and get 1 free. Valid on bags, belts, and jewelry.',
         code: 'ACC3FOR2',
@@ -392,10 +426,12 @@ async function main() {
         discountPercentage: 33,
         expirationDate: thirtyDaysFromNow,
         status: 'REJECTED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '35% OFF Winter Collection',
         description: 'Stay warm and stylish! 35% discount on our winter collection including coats, sweaters, and jackets.',
         code: 'WINTER35',
@@ -405,12 +441,14 @@ async function main() {
         discountPercentage: 35,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Food coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '15% OFF All Orders',
         description: 'Enjoy delicious meals with 15% discount on all menu items. Order online or dine-in. Valid for all locations.',
         code: 'FOOD15',
@@ -420,10 +458,12 @@ async function main() {
         discountPercentage: 15,
         expirationDate: thirtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: 'Free Dessert with Any Main Course',
         description: 'Treat yourself! Get a complimentary dessert when you order any main course. Choose from our premium dessert menu.',
         code: 'DESSERT2024',
@@ -433,10 +473,12 @@ async function main() {
         discountPercentage: 20,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '20% OFF Weekend Brunch',
         description: 'Start your weekend right! Enjoy 20% off on our weekend brunch menu. Available Saturdays and Sundays 10 AM - 2 PM.',
         code: 'BRUNCH20',
@@ -446,10 +488,12 @@ async function main() {
         discountPercentage: 20,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '30% OFF Family Meals',
         description: 'Feed the whole family! Get 30% off on family meal packages. Perfect for gatherings and special occasions.',
         code: 'FAMILY30',
@@ -459,12 +503,14 @@ async function main() {
         discountPercentage: 30,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Travel coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '35% OFF Hotel Bookings',
         description: 'Plan your dream vacation! Save 35% on hotel bookings worldwide. Luxury hotels at amazing prices.',
         code: 'HOTEL35',
@@ -474,10 +520,12 @@ async function main() {
         discountPercentage: 35,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '€100 OFF Flight Tickets',
         description: 'Fly for less! Get €100 discount on international flight bookings. Book now and save big on your next trip.',
         code: 'FLY100',
@@ -487,10 +535,12 @@ async function main() {
         discountPercentage: 25,
         expirationDate: sixtyDaysFromNow,
         status: 'PENDING',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '40% OFF Vacation Packages',
         description: 'All-inclusive vacation packages at unbeatable prices! Save 40% on complete travel packages including flights, hotels, and activities.',
         code: 'VACATION40',
@@ -500,10 +550,12 @@ async function main() {
         discountPercentage: 40,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '25% OFF Car Rentals',
         description: 'Explore at your own pace! Get 25% off on car rentals. Available for daily, weekly, and monthly rentals.',
         code: 'CAR25',
@@ -513,12 +565,14 @@ async function main() {
         discountPercentage: 25,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Beauty coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '30% OFF Beauty Products',
         description: 'Glow up with 30% off on all beauty and skincare products. Premium brands at incredible prices.',
         code: 'BEAUTY30',
@@ -528,10 +582,12 @@ async function main() {
         discountPercentage: 30,
         expirationDate: thirtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '50% OFF Spa Treatments',
         description: 'Relax and rejuvenate! Get 50% off on all spa treatments including massages, facials, and body treatments.',
         code: 'SPA50',
@@ -541,12 +597,14 @@ async function main() {
         discountPercentage: 50,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Home coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '45% OFF Home Decor',
         description: 'Transform your space! Get 45% discount on home decor items. Furniture, lighting, and accessories included.',
         code: 'HOME45',
@@ -556,10 +614,12 @@ async function main() {
         discountPercentage: 45,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '30% OFF Kitchen Appliances',
         description: 'Upgrade your kitchen! Get 30% off on all kitchen appliances including blenders, coffee makers, and more.',
         code: 'KITCHEN30',
@@ -569,12 +629,14 @@ async function main() {
         discountPercentage: 30,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Sports coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '20% OFF Gym Equipment',
         description: 'Build your home gym! 20% discount on all fitness equipment. Weights, treadmills, yoga mats, and more.',
         code: 'GYM20',
@@ -584,10 +646,12 @@ async function main() {
         discountPercentage: 20,
         expirationDate: ninetyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '35% OFF Sports Apparel',
         description: 'Get active in style! 35% off on all sports apparel including athletic wear, running shoes, and accessories.',
         code: 'SPORT35',
@@ -597,12 +661,14 @@ async function main() {
         discountPercentage: 35,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
 
     // Entertainment coupons
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '2 for 1 Movie Tickets',
         description: 'Enjoy movies for half the price! Buy one ticket and get one free. Valid for all shows and all days.',
         code: 'MOVIE2FOR1',
@@ -612,10 +678,12 @@ async function main() {
         discountPercentage: 50,
         expirationDate: thirtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
     prisma.coupon.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         title: '25% OFF Concert Tickets',
         description: 'Experience live music! Get 25% off on concert tickets for upcoming shows and festivals.',
         code: 'CONCERT25',
@@ -625,6 +693,7 @@ async function main() {
         discountPercentage: 25,
         expirationDate: sixtyDaysFromNow,
         status: 'APPROVED',
+        updatedAt: new Date(),
       },
     }),
   ])

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth-helpers"
+import crypto from "crypto"
 
 // POST - Seed fake community deals with votes and comments
 export async function POST(request: NextRequest) {
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
       // Create the deal
       const deal = await prisma.communityDeal.create({
         data: {
+          id: crypto.randomBytes(16).toString("hex"),
           title: dealData.title,
           description: dealData.description,
           category: dealData.category,
@@ -197,9 +199,11 @@ export async function POST(request: NextRequest) {
         const isUpvote = Math.random() > 0.2
         await prisma.communityDealVote.create({
           data: {
+            id: crypto.randomBytes(16).toString("hex"),
             dealId: deal.id,
             userId: voter.id,
             value: isUpvote ? 1 : -1,
+            updatedAt: new Date(),
           },
         })
       }
@@ -216,6 +220,7 @@ export async function POST(request: NextRequest) {
           sampleComments[Math.floor(Math.random() * sampleComments.length)]
         await prisma.communityDealComment.create({
           data: {
+            id: crypto.randomBytes(16).toString("hex"),
             dealId: deal.id,
             userId: commenter.id,
             text: commentText,

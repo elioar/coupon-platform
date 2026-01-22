@@ -35,14 +35,14 @@ export async function POST(
         status: status as CouponStatus,
       },
       include: {
-        business: {
+        User: {
           select: {
             id: true,
             name: true,
             email: true,
           },
         },
-        category: true,
+        Category: true,
       },
     })
 

@@ -143,6 +143,7 @@ export async function POST(
       try {
         redemption = await prisma.couponRedemption.create({
           data: {
+            id: randomBytes(16).toString("hex"),
             couponId: couponId,
             userId: user.id,
             redemptionToken: token,

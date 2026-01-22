@@ -30,11 +30,13 @@ async function getOrCreateSystemUser() {
     
     systemUser = await prisma.user.create({
       data: {
+        id: crypto.randomBytes(16).toString("hex"),
         email: systemEmail,
         password: randomPassword,
         name: "AI Import Bot",
         role: "USER",
         emailVerified: true,
+        updatedAt: new Date(),
       },
     })
   }

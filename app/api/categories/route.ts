@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth-helpers"
 import { z } from "zod"
+import crypto from "crypto"
 
 const createCategorySchema = z.object({
   nameEn: z.string().min(2).max(50),
@@ -37,7 +38,10 @@ export async function POST(request: NextRequest) {
     const validatedData = createCategorySchema.parse(body)
 
     const category = await prisma.category.create({
-      data: validatedData,
+      data: {
+        id: crypto.randomBytes(16).toString("hex"),
+        ...validatedData,
+      },
     })
 
     return NextResponse.json(

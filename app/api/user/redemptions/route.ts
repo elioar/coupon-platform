@@ -13,16 +13,16 @@ export async function GET(request: NextRequest) {
         eventType: "REDEMPTION"
       },
       include: {
-        coupon: {
+        Coupon: {
           include: {
-            category: {
+            Category: {
               select: {
                 id: true,
                 nameEn: true,
                 nameEl: true
               }
             },
-            business: {
+            User: {
               select: {
                 id: true,
                 name: true
@@ -41,12 +41,12 @@ export async function GET(request: NextRequest) {
       redemptions: redemptions.map(r => ({
         id: r.id,
         couponId: r.couponId,
-        couponTitle: r.coupon.title,
-        couponCode: r.coupon.code || null,
-        discountPercentage: r.coupon.discountPercentage,
-        imagePath: r.coupon.imagePath,
-        category: r.coupon.category,
-        business: r.coupon.business,
+        couponTitle: r.Coupon.title,
+        couponCode: r.Coupon.code || null,
+        discountPercentage: r.Coupon.discountPercentage,
+        imagePath: r.Coupon.imagePath,
+        category: r.Coupon.Category,
+        business: r.Coupon.User,
         redeemedAt: r.createdAt
       }))
     })

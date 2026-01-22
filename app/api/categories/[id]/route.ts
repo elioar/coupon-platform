@@ -69,7 +69,7 @@ export async function DELETE(
       where: { id },
       include: {
         _count: {
-          select: { coupons: true }
+          select: { Coupon: true }
         }
       }
     })
@@ -78,9 +78,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Category not found" }, { status: 404 })
     }
 
-    if (categoryWithCoupons._count.coupons > 0) {
+    if (categoryWithCoupons._count.Coupon > 0) {
       return NextResponse.json(
-        { error: `Cannot delete category with ${categoryWithCoupons._count.coupons} active coupons` },
+        { error: `Cannot delete category with ${categoryWithCoupons._count.Coupon} active coupons` },
         { status: 400 }
       )
     }
