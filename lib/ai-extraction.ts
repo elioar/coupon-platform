@@ -2,9 +2,20 @@ import OpenAI from "openai"
 import * as cheerio from "cheerio"
 import { z } from "zod"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Initialize OpenAI lazily to avoid build-time errors when env vars are not set
+let openaiInstance: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiInstance) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not defined in environment variables")
+    }
+    openaiInstance = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiInstance
+}
 
 const VALID_CATEGORIES = [
   "Food & Dining",
@@ -601,6 +612,9 @@ export async function extractDealFromUrl(url: string): Promise<ExtractionResult>
     console.log("[AI-EXTRACTION] Sending to OpenAI API...")
     console.log("[AI-EXTRACTION] URL candidates count:", urlCandidates.length)
     console.log("[AI-EXTRACTION] Text content length:", textContent.length)
+    
+    // Get OpenAI client (lazy initialization)
+    const openai = getOpenAIClient()
     
     let completion
     // Try gpt-5-mini first, fallback to gpt-4o-mini if not available
