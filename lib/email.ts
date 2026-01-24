@@ -1,6 +1,17 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Resend lazily to avoid build-time errors when env vars are not set
+let resendInstance: Resend | null = null
+
+function getResendClient() {
+  if (!resendInstance) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not defined in environment variables")
+    }
+    resendInstance = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resendInstance
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
@@ -34,6 +45,7 @@ export async function sendVerificationEmail(
   const t = translations[locale as keyof typeof translations] || translations.en
 
   try {
+    const resend = getResendClient()
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM!,
       to: [email],
@@ -150,6 +162,7 @@ export async function sendPasswordResetEmail(
   const t = translations[locale as keyof typeof translations] || translations.en
 
   try {
+    const resend = getResendClient()
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM!,
       to: [email],
