@@ -749,7 +749,7 @@ If NO deals found: { "isDeal": false }`,
           role: "user",
           content: `Extract all deals/offers/coupons from this webpage.
 
-IMPORTANT: Extract MAXIMUM 10 deals. If there are more than 10 deals on the page, extract only the first 10 most relevant/important ones.
+IMPORTANT: Extract MAXIMUM 5 deals. If there are more than 5 deals on the page, extract only the first 5 most relevant/important ones.
 
 SEARCH THOROUGHLY:
 - Look through ALL sections of the page: product listings, deal cards, banners, featured items, special offers
@@ -789,7 +789,7 @@ CRITICAL RULE FOR dealUrl:
 - Choose the most direct link to the product/deal page from the candidates that goes to the STORE/MERCHANT website
 - If there are no suitable store/product links in candidates, set dealUrl to null (leave it empty - admin will add it manually)
 
-Extract up to 10 deals (maximum) with their merchant names and deal URLs (selecting ONLY from urlCandidates above).
+Extract up to 5 deals (maximum) with their merchant names and deal URLs (selecting ONLY from urlCandidates above).
 Make sure to search the ENTIRE page content carefully to find all available deals.`,
         },
       ],
@@ -936,11 +936,11 @@ Make sure to search the ENTIRE page content carefully to find all available deal
 
     // Validate and normalize deals
     const deals: any[] = parsedResponse.deals || []
-    // Limit to maximum 10 deals
-    if (deals.length > 10) {
-      console.log(`[AI-EXTRACTION] Found ${deals.length} deals, limiting to first 10`)
+    // Limit to maximum 5 deals
+    if (deals.length > 5) {
+      console.log(`[AI-EXTRACTION] Found ${deals.length} deals, limiting to first 5`)
     }
-    const dealsToProcess = deals.slice(0, 10)
+    const dealsToProcess = deals.slice(0, 5)
     const validatedDeals: ExtractedDeal[] = []
 
     for (const dealData of dealsToProcess) {
