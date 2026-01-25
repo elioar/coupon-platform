@@ -33,5 +33,5 @@ export const stripe = new Proxy({} as Stripe, {
   }
 });
 
-export const MEMBERSHIP_PRICE = 1000; // €10.00 in cents
+export const MEMBERSHIP_PRICE = 500; // €5.00 in cents
 export const MEMBERSHIP_DURATION_DAYS = 365; // 1 year

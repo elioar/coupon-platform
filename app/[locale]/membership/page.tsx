@@ -48,7 +48,7 @@ export default function MembershipPage() {
     }
   }
 
-  const yearlyPrice = 10
+  const yearlyPrice = 5
   const yearlyPricePerMonth = yearlyPrice / 12
 
   const isMember = session?.user?.membershipExpiry && new Date(session.user.membershipExpiry) > new Date()
