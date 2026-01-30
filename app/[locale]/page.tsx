@@ -233,36 +233,38 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
                   </Link>
                 </motion.div>
                 
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Link
-                    href={`/${locale}/register/business`}
-                    className="group relative inline-flex h-14 items-center justify-center gap-2 rounded-xl border-2 border-green-500 bg-white px-8 font-semibold text-green-600 shadow-lg transition-all hover:border-green-600 hover:bg-green-50 hover:shadow-xl dark:border-green-500 dark:bg-zinc-900 dark:text-green-400 dark:hover:bg-green-900/20"
+                {session?.user?.role === 'BUSINESS' && (
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <motion.span
-                      className="relative z-10 flex items-center gap-2"
-                      whileHover={{ x: 5 }}
-                      transition={{ type: "spring", stiffness: 400 }}
+                    <Link
+                      href={`/${locale}/dashboard/business?section=coupons`}
+                      className="group relative inline-flex h-14 items-center justify-center gap-2 rounded-xl border-2 border-green-500 bg-white px-8 font-semibold text-green-600 shadow-lg transition-all hover:border-green-600 hover:bg-green-50 hover:shadow-xl dark:border-green-500 dark:bg-zinc-900 dark:text-green-400 dark:hover:bg-green-900/20"
                     >
-                      <motion.svg
-                        className="h-5 w-5"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        animate={{ rotate: [0, 90, 0] }}
-                        transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
+                      <motion.span
+                        className="relative z-10 flex items-center gap-2"
+                        whileHover={{ x: 5 }}
+                        transition={{ type: "spring", stiffness: 400 }}
                       >
-                        <path d="M12 4v16m8-8H4" />
-                      </motion.svg>
-                      {t('hero.addYourCoupon')}
-                    </motion.span>
-                  </Link>
-                </motion.div>
+                        <motion.svg
+                          className="h-5 w-5"
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          animate={{ rotate: [0, 90, 0] }}
+                          transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }}
+                        >
+                          <path d="M12 4v16m8-8H4" />
+                        </motion.svg>
+                        {t('hero.addYourCoupon')}
+                      </motion.span>
+                    </Link>
+                  </motion.div>
+                )}
               </motion.div>
 
               {/* Statistics */}

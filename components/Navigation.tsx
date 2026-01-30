@@ -137,11 +137,11 @@ export default function Navigation() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="hidden items-center gap-2 md:flex"
+            className="hidden items-center gap-3 md:flex"
           >
             <Link
               href={`/${locale}/coupons`}
-              className="group flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+              className="group flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
             >
               <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                 <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -151,7 +151,7 @@ export default function Navigation() {
             
             <Link
               href={`/${locale}/community`}
-              className="group flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+              className="group flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
             >
               <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                 <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -161,7 +161,7 @@ export default function Navigation() {
             
             <Link
               href={`/${locale}/membership`}
-              className="group flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+              className="group flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-green-50 hover:text-green-600 dark:text-zinc-300 dark:hover:bg-green-900/20 dark:hover:text-green-400"
             >
               <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                 <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -172,27 +172,38 @@ export default function Navigation() {
             {session && session.user.role !== "ADMIN" && (
               <Link
                 href={getDashboardUrl()}
-                className="group flex items-center gap-2 rounded-xl border-2 border-green-500 bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-green-500/20 transition-all hover:from-green-600 hover:to-emerald-600 hover:shadow-lg hover:shadow-green-500/30"
+                className="group flex shrink-0 items-center gap-2 rounded-xl border-2 border-green-500 bg-gradient-to-r from-green-500 to-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-md shadow-green-500/20 transition-all hover:from-green-600 hover:to-emerald-600 hover:shadow-lg hover:shadow-green-500/30"
               >
-                <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                   <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 {getDashboardLabel()}
               </Link>
             )}
 
-            <div className="mx-2 h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
+            {session?.user?.role === "BUSINESS" && (
+              <Link
+                href={`/${locale}/dashboard/business?section=coupons`}
+                className="group flex items-center gap-2 rounded-xl border-2 border-green-400/80 bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-700 transition-all hover:border-green-500 hover:bg-green-500/20 dark:border-green-500/80 dark:bg-green-500/15 dark:text-green-400 dark:hover:border-green-400 dark:hover:bg-green-500/25"
+              >
+                <svg className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="whitespace-nowrap">Add Your Coupon</span>
+              </Link>
+            )}
+
+            <div className="mx-1 h-6 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700" aria-hidden />
 
             {/* Theme Toggle */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
-                // Always set explicit theme (never "system")
                 const newTheme = resolvedTheme === "dark" ? "light" : "dark"
                 setTheme(newTheme)
               }}
-              className="flex items-center justify-center rounded-xl border border-zinc-200 bg-white p-2 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+              className="flex shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white p-2 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20"
               aria-label="Toggle theme"
               title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
             >
@@ -208,7 +219,7 @@ export default function Navigation() {
             </motion.button>
 
             {/* Language Switcher Dropdown */}
-            <div className="relative" ref={langDropdownRef}>
+            <div className="relative shrink-0" ref={langDropdownRef}>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -274,18 +285,18 @@ export default function Navigation() {
 
             {/* Profile Dropdown or Auth Buttons */}
             {session ? (
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative shrink-0" ref={dropdownRef}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 hover:shadow dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+                  className="flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white pl-2 pr-2.5 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-50 hover:shadow dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20"
                 >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-xs font-bold text-white shadow-sm">
-                    {session.user.name.charAt(0).toUpperCase()}
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-xs font-bold text-white shadow-sm">
+                    {(session.user.name ?? "U").charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    {session.user.name}
+                  <span className="max-w-[140px] truncate text-sm font-medium text-zinc-700 dark:text-zinc-300" title={session.user.name ?? undefined}>
+                    {(session.user.name ?? "").replace(/\bBusinnes\b/gi, "Business")}
                   </span>
                   <svg
                     className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${
@@ -317,9 +328,9 @@ export default function Navigation() {
                           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 text-base font-bold text-white shadow-md">
                             {session.user.name.charAt(0).toUpperCase()}
                           </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                            {session.user.name}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                            {(session.user.name ?? "").replace(/\bBusinnes\b/gi, "Business")}
                           </p>
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">
                             {session.user.email}
@@ -387,16 +398,6 @@ export default function Navigation() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="flex items-center gap-2"
               >
-                {/* Add Your Coupon Button for Unregistered Users */}
-                <Link
-                  href={`/${locale}/register/business`}
-                  className="group flex items-center gap-2 rounded-xl border-2 border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700 shadow-sm transition-all hover:border-green-300 hover:bg-green-100 hover:shadow dark:border-green-800 dark:bg-green-900/20 dark:text-green-300 dark:hover:border-green-700 dark:hover:bg-green-900/30"
-                >
-                  <svg className="h-4 w-4 transition-transform group-hover:scale-110" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Your Coupon
-                </Link>
                 <Link
                   href={`/${locale}/login`}
                   className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:text-green-600 dark:text-zinc-300 dark:hover:text-green-400"
@@ -553,16 +554,16 @@ export default function Navigation() {
                     </Link>
                   )}
 
-                  {!session && (
+                  {session?.user?.role === "BUSINESS" && (
                     <Link
-                      href={`/${locale}/register/business`}
+                      href={`/${locale}/dashboard/business?section=coupons`}
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       <svg className="h-4 w-4 text-zinc-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                        <path d="M9 17v2a2 2 0 002 2h2a2 2 0 002-2v-2m3-5a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path d="M12 4v16m8-8H4" />
                       </svg>
-                      <span>{t("listBusiness")}</span>
+                      <span>Add Your Coupon</span>
                     </Link>
                   )}
 
