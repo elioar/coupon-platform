@@ -61,6 +61,9 @@ export default function CommunityPage() {
   const [deals, setDeals] = useState<CommunityDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "ONLINE" | "IN_STORE">(
+    () => (searchParams.get("type") as "ALL" | "ONLINE" | "IN_STORE") || "ALL"
+  )
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<CommunityDeal | null>(null)
   const [creating, setCreating] = useState(false)
@@ -93,7 +96,7 @@ export default function CommunityPage() {
     }
   }, [])
 
-  const updateUrlParams = (updates: { category?: string | null; q?: string; page?: number }) => {
+  const updateUrlParams = (updates: { category?: string | null; q?: string; page?: number; type?: string | null }) => {
     const paramsCopy = new URLSearchParams(searchParams.toString())
 
     if ("category" in updates) {
@@ -123,6 +126,15 @@ export default function CommunityPage() {
       }
     }
 
+    if ("type" in updates) {
+      const typeValue = updates.type
+      if (typeValue && typeValue !== "ALL") {
+        paramsCopy.set("type", typeValue)
+      } else {
+        paramsCopy.delete("type")
+      }
+    }
+
     const queryString = paramsCopy.toString()
     router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
   }
@@ -132,15 +144,29 @@ export default function CommunityPage() {
     updateUrlParams({ page })
   }
 
+  const handleCategoryChange = (category: string | null) => {
+    setSelectedCategory(category)
+    setCurrentPage(1)
+    updateUrlParams({ category, page: 1 })
+  }
+
+  const handleTypeChange = (type: "ALL" | "ONLINE" | "IN_STORE") => {
+    setTypeFilter(type)
+    setCurrentPage(1)
+    updateUrlParams({ type, page: 1 })
+  }
+
   useEffect(() => {
     const categoryParam = searchParams.get("category")
     const queryParam = searchParams.get("q") ?? ""
     const pageParam = searchParams.get("page")
+    const typeParam = (searchParams.get("type") as "ALL" | "ONLINE" | "IN_STORE") || "ALL"
     const parsedPage = pageParam ? parseInt(pageParam, 10) : 1
     const normalizedPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
 
     setSelectedCategory(categoryParam ?? null)
     setSearchQuery(queryParam)
+    setTypeFilter(typeParam)
     setCurrentPage(normalizedPage)
   }, [searchParams])
 
@@ -482,9 +508,18 @@ export default function CommunityPage() {
     )
   }, [])
 
-  const filteredDeals = selectedCategory
-    ? deals.filter((deal) => deal.category === selectedCategory)
-    : deals
+  const filteredDeals = deals.filter((deal) => {
+    if (selectedCategory && deal.category !== selectedCategory) {
+      return false
+    }
+    if (typeFilter === "ONLINE" && !!deal.location) {
+      return false
+    }
+    if (typeFilter === "IN_STORE" && !deal.location) {
+      return false
+    }
+    return true
+  })
 
   const searchedDeals = filteredDeals.filter((deal) => {
     if (!searchQuery.trim()) return true
@@ -654,11 +689,11 @@ export default function CommunityPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-6"
+          className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
         >
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => handleCategoryChange(null)}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 selectedCategory === null
                   ? "bg-green-500 text-white"
@@ -670,7 +705,7 @@ export default function CommunityPage() {
             {categories.map((category) => (
               <button
                 key={category}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => handleCategoryChange(category)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === category
                     ? "bg-green-500 text-white"
@@ -680,6 +715,39 @@ export default function CommunityPage() {
                 {category}
               </button>
             ))}
+          </div>
+
+          <div className="flex flex-wrap gap-1 rounded-xl border border-zinc-200 bg-white/50 p-1 dark:border-zinc-800 dark:bg-zinc-900/50 sm:shrink-0">
+            <button
+              onClick={() => handleTypeChange("ALL")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                typeFilter === "ALL"
+                  ? "bg-green-500 text-white shadow-sm"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              }`}
+            >
+              {t("typeAll")}
+            </button>
+            <button
+              onClick={() => handleTypeChange("ONLINE")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                typeFilter === "ONLINE"
+                  ? "bg-green-500 text-white shadow-sm"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              }`}
+            >
+              {t("typeOnline")}
+            </button>
+            <button
+              onClick={() => handleTypeChange("IN_STORE")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                typeFilter === "IN_STORE"
+                  ? "bg-green-500 text-white shadow-sm"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              }`}
+            >
+              {t("typeInStore")}
+            </button>
           </div>
         </motion.div>
 
@@ -890,4 +958,3 @@ export default function CommunityPage() {
     </div>
   )
 }
-
