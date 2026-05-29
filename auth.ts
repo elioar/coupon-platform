@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "./lib/prisma"
 import bcrypt from "bcryptjs"
@@ -94,6 +95,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
+          role: Role.USER, // Default role for OAuth users
+          emailVerified: true,
+        }
+      },
+    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -110,7 +125,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         })
 
-        if (!user) {
+        // Social login users might not have a password set
+        if (!user || !user.password) {
           return null
         }
 
