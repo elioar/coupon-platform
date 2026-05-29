@@ -205,7 +205,7 @@ model User {
   role                                                  Role                   @default(USER)
   membershipExpiry                                      DateTime?
   createdAt                                             DateTime               @default(now())
-  updatedAt                                             DateTime
+  updatedAt                                             DateTime               @default(now()) @updatedAt
   about                                                 String?
   address                                               String?
   birthDate                                             DateTime?
