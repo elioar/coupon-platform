@@ -72,6 +72,10 @@ A modern, full-stack web platform where users and businesses can register and in
    # Same key for client-side (required for Places Autocomplete)
    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-maps-api-key-here"
 
+   # Google OAuth (for Google Login)
+   GOOGLE_CLIENT_ID="your-google-client-id"
+   GOOGLE_CLIENT_SECRET="your-google-client-secret"
+   
    # App
    NEXT_PUBLIC_APP_URL="http://localhost:3000"
    ```
