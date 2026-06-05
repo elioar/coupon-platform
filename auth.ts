@@ -41,6 +41,29 @@ const sanitizeBusinessDescription = (value: string | null) => {
   }
 }
 
+const prismaAdapter = PrismaAdapter(prisma) as Adapter
+
+const customAdapter: Adapter = {
+  ...prismaAdapter,
+  createUser: async (user) => {
+    return prismaAdapter.createUser!({
+      ...user,
+      emailVerified: true as any, // Social signups are automatically verified
+    })
+  },
+  updateUser: async (user) => {
+    const data = { ...user }
+    if ('emailVerified' in data) {
+      if (data.emailVerified) {
+        data.emailVerified = true as any
+      } else {
+        delete data.emailVerified
+      }
+    }
+    return prismaAdapter.updateUser!(data)
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Ensure the same secret is used across app, middleware, and API routes
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
@@ -87,7 +110,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     },
   },
-  adapter: PrismaAdapter(prisma) as Adapter,
+  adapter: customAdapter,
   session: {
     strategy: "jwt",
   },
