@@ -46,13 +46,16 @@ const prismaAdapter = PrismaAdapter(prisma) as Adapter
 const customAdapter: Adapter = {
   ...prismaAdapter,
   createUser: async (user) => {
+    const data = { ...user }
+    delete (data as any).image
     return prismaAdapter.createUser!({
-      ...user,
+      ...data,
       emailVerified: true as any, // Social signups are automatically verified
     })
   },
   updateUser: async (user) => {
     const data = { ...user }
+    delete (data as any).image
     if ('emailVerified' in data) {
       if (data.emailVerified) {
         data.emailVerified = true as any
