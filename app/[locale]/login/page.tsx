@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
 import { useTranslations } from "next-intl"
@@ -18,6 +18,15 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("rememberedEmail")
+    if (savedEmail) {
+      setFormData((prev) => ({ ...prev, email: savedEmail }))
+      setRememberMe(true)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +43,11 @@ export default function LoginPage() {
       if (result?.error) {
         setError(t("error"))
       } else {
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", formData.email)
+        } else {
+          localStorage.removeItem("rememberedEmail")
+        }
         router.push(`/${locale}`)
         router.refresh()
       }
@@ -119,6 +133,7 @@ export default function LoginPage() {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    autoComplete="email"
                     className="w-full pl-10 pr-4 py-2.5 sm:py-3 text-sm rounded-lg border-2 border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-green-500"
                     placeholder="john@example.com"
                   />
@@ -142,6 +157,7 @@ export default function LoginPage() {
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    autoComplete="current-password"
                     className="w-full pl-10 pr-10 py-2.5 sm:py-3 text-sm rounded-lg border-2 border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-green-500"
                     placeholder="••••••••"
                   />
@@ -164,8 +180,29 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Forgot Password Link */}
-              <div className="flex items-center justify-end">
+              {/* Remember Me and Forgot Password Links */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer select-none group">
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <div className="h-4 w-4 rounded border-2 border-zinc-300 bg-white transition-all peer-checked:border-green-500 peer-checked:bg-green-500 dark:border-zinc-700 dark:bg-zinc-800 dark:peer-checked:border-green-500 dark:peer-checked:bg-green-500 group-hover:border-green-400 dark:group-hover:border-zinc-600 focus-within:ring-2 focus-within:ring-green-500/20" />
+                    <svg
+                      className="absolute h-2.5 w-2.5 text-white scale-0 transition-transform peer-checked:scale-100 pointer-events-none"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span>{t("rememberMe")}</span>
+                </label>
                 <Link
                   href={`/${locale}/forgot-password`}
                   className="text-xs sm:text-sm text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors"

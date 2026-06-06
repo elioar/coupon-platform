@@ -135,7 +135,8 @@
       "feature3Title": "Personalized Recommendations",
       "feature3Description": "Get deals tailored to your interests",
       "saveMoreBadge": "Save More Today!",
-      "forgotPassword": "Forgot password?"
+      "forgotPassword": "Forgot password?",
+      "rememberMe": "Remember me"
     },
     "register": {
       "title": "Create Account",
