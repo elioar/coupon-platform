@@ -20,6 +20,8 @@ interface CategoryFilterProps {
   locationLoading: boolean
   geolocationSupported: boolean
   onNearMeClick: () => void
+  typeFilter?: "ALL" | "ONLINE" | "IN_STORE"
+  onTypeFilterChange?: (type: "ALL" | "ONLINE" | "IN_STORE") => void
 }
 
 export default function CategoryFilter({
@@ -33,6 +35,8 @@ export default function CategoryFilter({
   locationLoading,
   geolocationSupported,
   onNearMeClick,
+  typeFilter,
+  onTypeFilterChange,
 }: CategoryFilterProps) {
   const t = useTranslations("coupons")
   const tCommon = useTranslations("common")
@@ -132,6 +136,29 @@ export default function CategoryFilter({
               </button>
             )
           })}
+
+          {onTypeFilterChange && typeFilter !== undefined && (
+            <>
+              <div className="flex-shrink-0 self-center w-px h-6 bg-zinc-300 dark:bg-zinc-700 mx-1" />
+              {(["ALL", "ONLINE", "IN_STORE"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => onTypeFilterChange(type)}
+                  className={`flex-shrink-0 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 drop-shadow-sm ${
+                    typeFilter === type
+                      ? type === "IN_STORE"
+                        ? "border-transparent bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30"
+                        : type === "ONLINE"
+                        ? "border-transparent bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                        : "border-transparent bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/40"
+                      : "border-zinc-200 bg-white/80 text-zinc-600 hover:border-green-400 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                  }`}
+                >
+                  {type === "ALL" ? t("typeAll") : type === "ONLINE" ? t("typeOnline") : t("typeInStore")}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>

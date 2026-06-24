@@ -63,6 +63,7 @@ export default function CouponsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => searchParams.get("category"))
   const [searchQuery, setSearchQuery] = useState<string>(() => searchParams.get("q") ?? "")
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "ONLINE" | "IN_STORE">("ALL")
   const [loading, setLoading] = useState(true)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
   const [currentPage, setCurrentPage] = useState(getInitialPage)
@@ -314,8 +315,17 @@ export default function CouponsPage() {
     }
   }, [nearMeEnabled, userLocation, locale, t])
 
-  // Filter coupons based on search query and category
+  const handleTypeFilterChange = (type: "ALL" | "ONLINE" | "IN_STORE") => {
+    setTypeFilter(type)
+    setCurrentPage(1)
+  }
+
+  // Filter coupons based on search query, category, and type
   const filteredCoupons = allCoupons.filter((coupon) => {
+    // Type filter
+    if (typeFilter === "ONLINE" && coupon.couponType !== "ONLINE_CODE") return false
+    if (typeFilter === "IN_STORE" && coupon.couponType !== "QR_CODE") return false
+
     // Category filter
     if (selectedCategory && coupon.category.id !== selectedCategory) {
       return false
@@ -447,6 +457,8 @@ export default function CouponsPage() {
             locationLoading={locationLoading}
             geolocationSupported={geolocationSupported}
             onNearMeClick={handleNearMeClick}
+            typeFilter={typeFilter}
+            onTypeFilterChange={handleTypeFilterChange}
           />
         </motion.div>
 

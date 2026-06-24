@@ -357,7 +357,10 @@
     "showQR": "Εμφάνιση QR",
     "qrCode": "QR Code",
     "qrCodeDescription": "Δείξτε αυτό το QR code στο κατάστημα",
-    "showQRCodeAtStore": "Δείξτε αυτό το QR code στο κατάστημα για εξαργύρωση"
+    "showQRCodeAtStore": "Δείξτε αυτό το QR code στο κατάστημα για εξαργύρωση",
+    "typeAll": "Όλα",
+    "typeOnline": "Online",
+    "typeInStore": "Δια ζώσης"
   },
   "community": {
     "title": "Προσφορές Κοινότητας",

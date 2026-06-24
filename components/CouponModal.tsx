@@ -231,10 +231,19 @@ export default function CouponModal({ coupon, isMember, locale, onClose }: Coupo
 
         {/* Content */}
         <div className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              {categoryName}
-            </span>
+          <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                {categoryName}
+              </span>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                coupon.couponType === "QR_CODE"
+                  ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              }`}>
+                {coupon.couponType === "QR_CODE" ? t("typeInStore") : t("typeOnline")}
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

@@ -275,8 +275,24 @@ export default function CouponCard({ coupon, isMember, locale, onDetailsClick }:
 
         {/* Content */}
         <div className="relative p-6">
-          {/* Expiration Date */}
-          <div className="mb-3 flex items-center justify-end">
+          {/* Type Badge + Expiration Date */}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              coupon.couponType === "QR_CODE"
+                ? "bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300"
+                : "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+            }`}>
+              {coupon.couponType === "QR_CODE" ? (
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              ) : (
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+              )}
+              {coupon.couponType === "QR_CODE" ? t("typeInStore") : t("typeOnline")}
+            </div>
             <div className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
