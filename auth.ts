@@ -124,6 +124,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      // Link Google sign-in to an existing account with the same email
+      // (e.g. a user who first registered with email + password).
+      // Safe for Google specifically because Google verifies email ownership.
+      allowDangerousEmailAccountLinking: true,
       profile(profile) {
         return {
           id: profile.sub,
@@ -276,6 +280,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.businessLongitude = (token.businessLongitude as number | null) ?? null
       }
       return session
+    },
+  },
+  events: {
+    // When a Google account is linked to a pre-existing email/password user,
+    // mark the email as verified — Google has proven the user owns it.
+    linkAccount: async ({ user }) => {
+      if (user.id) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        })
+      }
     },
   },
 })
