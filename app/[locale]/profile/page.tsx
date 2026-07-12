@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations, useLocale } from "next-intl"
 import Navigation from "@/components/Navigation"
-import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
+import AddressAutocomplete from "@/components/AddressAutocomplete"
 
 interface ProfileResponse {
   profile: {
@@ -535,7 +535,7 @@ export default function ProfilePage() {
                           <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-white/40">
                             <span>{tProfile("businessLocation")}</span>
                           </div>
-                          <GooglePlacesAutocomplete
+                          <AddressAutocomplete
                             value={formData.businessLocation}
                             onChange={(value) => handleChange("businessLocation", value)}
                             placeholder="Enter your business location..."

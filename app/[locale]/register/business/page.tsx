@@ -8,8 +8,8 @@ import { useForm, Controller } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion, AnimatePresence } from "framer-motion"
-import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
-import GoogleMapPicker from "@/components/GoogleMapPicker"
+import AddressAutocomplete from "@/components/AddressAutocomplete"
+import OpenStreetMapPicker from "@/components/OpenStreetMapPicker"
 
 const businessRegistrationSchema = z
   .object({
@@ -25,8 +25,8 @@ const businessRegistrationSchema = z
     categoryId: z.string().min(1, "Select a business category"),
     description: z.string().optional().or(z.literal("")),
     address: z.string().min(3, "Business address is required"),
-    city: z.string().min(2, "City is required").optional().or(z.literal("")),
-    postalCode: z.string().min(4, "Postal code is required").optional().or(z.literal("")),
+    city: z.string().min(2, "City is required"),
+    postalCode: z.string().min(4, "Postal code is required"),
     website: z.union([z.string().url("Please enter a valid URL"), z.literal("")]).optional(),
     instagram: z.union([z.string().url("Please enter a valid URL"), z.literal("")]).optional(),
     facebook: z.union([z.string().url("Please enter a valid URL"), z.literal("")]).optional(),
@@ -677,13 +677,9 @@ export default function BusinessRegisterPage() {
                 name="address"
                 control={businessForm.control}
                 render={({ field }) => (
-                  <GooglePlacesAutocomplete
+                  <AddressAutocomplete
                     value={field.value}
-                    onChange={(value) => {
-                      field.onChange(value)
-                      // Optionally auto-fill city and postal code if available
-                      // This would require parsing the address components
-                    }}
+                    onChange={(value) => field.onChange(value)}
                     placeholder="Enter your business address..."
                     locale={locale}
                     className="mt-1.5 sm:mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500"
@@ -703,38 +699,18 @@ export default function BusinessRegisterPage() {
                 name="address"
                 control={businessForm.control}
                 render={({ field }) => (
-                  <GoogleMapPicker
+                  <OpenStreetMapPicker
                     address={field.value}
                     darkMode={typeof window !== "undefined" && document.documentElement.classList.contains("dark")}
-                    onLocationChange={(address, lat, lng) => {
+                    onLocationChange={(address, lat, lng, details) => {
                       field.onChange(address)
                       setLocationCoordinates({ lat, lng })
-                      
-                      // Extract city and postal code from address using reverse geocoding
-                      if (window.google?.maps?.Geocoder) {
-                        const geocoder = new window.google.maps.Geocoder()
-                        geocoder.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
-                          if (status === "OK" && results[0]) {
-                            const addressComponents = results[0].address_components
-                            
-                            // Extract city
-                            const cityComponent = addressComponents.find((component: any) =>
-                              component.types.includes("locality") || 
-                              component.types.includes("administrative_area_level_2")
-                            )
-                            if (cityComponent) {
-                              businessForm.setValue("city", cityComponent.long_name, { shouldValidate: true })
-                            }
-                            
-                            // Extract postal code
-                            const postalCodeComponent = addressComponents.find((component: any) =>
-                              component.types.includes("postal_code")
-                            )
-                            if (postalCodeComponent) {
-                              businessForm.setValue("postalCode", postalCodeComponent.long_name, { shouldValidate: true })
-                            }
-                          }
-                        })
+
+                      if (details?.city) {
+                        businessForm.setValue("city", details.city, { shouldValidate: true })
+                      }
+                      if (details?.postalCode) {
+                        businessForm.setValue("postalCode", details.postalCode, { shouldValidate: true })
                       }
                     }}
                     locale={locale}
@@ -745,9 +721,38 @@ export default function BusinessRegisterPage() {
               <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
                 {tBusiness("mapInstructions")}
               </p>
-              {/* Hidden fields to store city and postal code (auto-filled from map) */}
-              <input type="hidden" {...businessForm.register("city")} />
-              <input type="hidden" {...businessForm.register("postalCode")} />
+
+              {/* City & Postal Code — auto-filled from the map, but editable manually as a fallback */}
+              <div className="mt-4 grid gap-4 sm:gap-5 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {locale === "el" ? "Πόλη" : "City"} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    {...businessForm.register("city")}
+                    className="mt-1.5 sm:mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+                    placeholder={locale === "el" ? "π.χ. Θεσσαλονίκη" : "e.g. Thessaloniki"}
+                  />
+                  {businessForm.formState.errors.city && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{businessForm.formState.errors.city.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {locale === "el" ? "Ταχυδρομικός Κώδικας" : "Postal Code"} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    {...businessForm.register("postalCode")}
+                    className="mt-1.5 sm:mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+                    placeholder={locale === "el" ? "π.χ. 54622" : "e.g. 54622"}
+                  />
+                  {businessForm.formState.errors.postalCode && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{businessForm.formState.errors.postalCode.message}</p>
+                  )}
+                </div>
+              </div>
             </div>
           </motion.div>
         )

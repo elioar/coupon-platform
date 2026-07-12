@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import Image from "next/image"
 import Button from "./Button"
-import GooglePlacesAutocomplete from "./GooglePlacesAutocomplete"
+import AddressAutocomplete from "./AddressAutocomplete"
 
 interface DealFormData {
   title: string
@@ -289,7 +289,7 @@ export function EditDealModal({
           <div>
             <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("form.location")}</label>
             {!deal ? (
-              <GooglePlacesAutocomplete
+              <AddressAutocomplete
                 value={formData.location}
                 onChange={(value) => {
                   if (placeSelectedRef.current) {

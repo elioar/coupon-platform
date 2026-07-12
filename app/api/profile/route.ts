@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth-helpers"
+import { geocodeAddress } from "@/lib/geocoding"
 import { Role } from "@prisma/client"
 
 const profileSchema = z.object({
@@ -62,57 +63,6 @@ const userSelect = {
   businessLatitude: true,
   businessLongitude: true,
 } as const
-
-async function geocodeAddress(address: string, locale: string) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  
-  if (!apiKey) {
-    console.error("GOOGLE_MAPS_API_KEY is not set")
-    throw new Error("Google Maps API key is not configured")
-  }
-
-  // Convert locale to Google Maps language code (e.g., "el" -> "el", "en" -> "en")
-  const language = locale === "el" ? "el" : "en"
-  
-  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json")
-  url.searchParams.set("address", address)
-  url.searchParams.set("key", apiKey)
-  url.searchParams.set("language", language)
-
-  const response = await fetch(url.toString(), {
-    next: { revalidate: 0 },
-  })
-
-  if (!response.ok) {
-    throw new Error("Failed to geocode address")
-  }
-
-  const data = await response.json()
-  
-  // Check for API errors
-  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    console.error("Google Maps Geocoding API error:", data.status, data.error_message)
-    throw new Error(`Geocoding failed: ${data.status}`)
-  }
-
-  // Handle no results
-  if (data.status === "ZERO_RESULTS" || !data.results || data.results.length === 0) {
-    return null
-  }
-
-  // Get the first result (most relevant)
-  const result = data.results[0]
-  const location = result.geometry.location
-  
-  const latitude = location.lat
-  const longitude = location.lng
-
-  if (typeof latitude !== "number" || typeof longitude !== "number") {
-    return null
-  }
-
-  return { latitude, longitude }
-}
 
 export async function GET() {
   try {

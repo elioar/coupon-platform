@@ -13,7 +13,37 @@ function getResendClient() {
   return resendInstance
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+/**
+ * Base URL for links we put inside emails.
+ *
+ * A localhost link in an email is dead for every recipient - it points at *their*
+ * machine. So only fall back to localhost when we're genuinely not deployed: on Vercel
+ * we use the real production domain even if NEXT_PUBLIC_APP_URL was never configured.
+ */
+function resolveAppUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  const isDeployed = Boolean(process.env.VERCEL)
+
+  if (configured && !(isDeployed && configured.includes("localhost"))) {
+    return configured.replace(/\/$/, "")
+  }
+
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  if (productionUrl) {
+    return `https://${productionUrl}`
+  }
+
+  if (isDeployed) {
+    console.error(
+      "NEXT_PUBLIC_APP_URL is missing or points at localhost in a deployed environment; " +
+        "email links will be broken. Set it to the production URL."
+    )
+  }
+
+  return "http://localhost:3000"
+}
+
+const APP_URL = resolveAppUrl()
 
 export async function sendVerificationEmail(
   email: string,

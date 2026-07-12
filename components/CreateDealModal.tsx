@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import GooglePlacesAutocomplete from "./GooglePlacesAutocomplete"
+import AddressAutocomplete from "./AddressAutocomplete"
 
 interface CreateDealModalProps {
   isOpen: boolean
@@ -365,7 +365,7 @@ export default function CreateDealModal({ isOpen, onClose, onSuccess, locale }: 
                     <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       {t("form.location")} <span className="text-red-500">*</span>
                     </label>
-                    <GooglePlacesAutocomplete
+                    <AddressAutocomplete
                       value={formData.location}
                       onChange={(value) => {
                         console.log("[CreateDealModal] onChange called for:", value, "placeSelected:", placeSelectedRef.current)

@@ -8,7 +8,8 @@ import Link from "next/link"
 import DashboardSidebar from "@/components/DashboardSidebar"
 import DashboardHeader from "@/components/DashboardHeader"
 import Button from "@/components/Button"
-import GooglePlacesAutocomplete from "@/components/GooglePlacesAutocomplete"
+import AddressAutocomplete from "@/components/AddressAutocomplete"
+import OpenStreetMapPicker from "@/components/OpenStreetMapPicker"
 import { useRouter } from "next/navigation"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -145,7 +146,19 @@ export default function BusinessDashboard() {
   }, [showForm, showTypeSelection])
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("ALL")
+  // The coupon awaiting delete confirmation (drives the confirmation modal).
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null)
+  // True while the DELETE request is in flight.
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Location picker modal. The map only mounts while the modal is open, and edits go to
+  // a draft so Cancel discards them.
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [locationDraft, setLocationDraft] = useState<{
+    address: string
+    latitude: number | null
+    longitude: number | null
+  }>({ address: "", latitude: null, longitude: null })
   const [resubmittingCouponId, setResubmittingCouponId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [showQRScanner, setShowQRScanner] = useState(false)
@@ -553,7 +566,7 @@ export default function BusinessDashboard() {
   }
 
   const handleDeleteCoupon = async (couponId: string) => {
-    setDeletingCouponId(couponId)
+    setIsDeleting(true)
     setMessage(null)
 
     try {
@@ -572,6 +585,7 @@ export default function BusinessDashboard() {
       } catch (error) {
         setMessage({ type: 'error', text: 'An error occurred. Please try again.' })
     } finally {
+      setIsDeleting(false)
       setDeletingCouponId(null)
       setTimeout(() => setMessage(null), 5000)
     }
@@ -1557,16 +1571,56 @@ export default function BusinessDashboard() {
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">Location</label>
-                      <GooglePlacesAutocomplete
+                      <AddressAutocomplete
                         value={profileData.businessLocation}
-                        onChange={(value) => setProfileData({ ...profileData, businessLocation: value })}
-                        onCoordinatesChange={(lat, lng) => {
-                          setProfileData({ ...profileData, businessLatitude: lat, businessLongitude: lng })
-                        }}
+                        onChange={(value) =>
+                          setProfileData((prev) => ({ ...prev, businessLocation: value }))
+                        }
+                        onCoordinatesChange={(lat, lng) =>
+                          setProfileData((prev) => ({
+                            ...prev,
+                            businessLatitude: lat,
+                            businessLongitude: lng,
+                          }))
+                        }
                         placeholder="e.g., Athens, Greece"
                         locale={locale}
                         className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:shadow-lg focus:shadow-green-500/10 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
                       />
+                    </div>
+                  </div>
+
+                  {/* Exact location - opens the map in a modal so it isn't always mounted */}
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                      Exact Location
+                    </label>
+                    <div className="flex flex-col gap-3 rounded-xl bg-gray-50/80 p-4 sm:flex-row sm:items-center sm:justify-between dark:bg-zinc-800/50">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <svg className="h-5 w-5 flex-shrink-0 text-green-500" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" stroke="currentColor">
+                          <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <p className="min-w-0 truncate text-sm text-gray-700 dark:text-zinc-300">
+                          {profileData.businessLatitude != null && profileData.businessLongitude != null
+                            ? `${profileData.businessLatitude.toFixed(5)}, ${profileData.businessLongitude.toFixed(5)}`
+                            : "No exact location set yet"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocationDraft({
+                            address: profileData.businessLocation,
+                            latitude: profileData.businessLatitude,
+                            longitude: profileData.businessLongitude,
+                          })
+                          setShowLocationModal(true)
+                        }}
+                        className="flex-shrink-0 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700"
+                      >
+                        Change Location Address
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2970,6 +3024,152 @@ export default function BusinessDashboard() {
 
         </div>
       </main>
+
+      {/* Change Location Modal */}
+      {showLocationModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLocationModal(false)
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm dark:bg-black/70"></div>
+
+          {/* Modal */}
+          <div
+            className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
+            style={{ animation: 'scaleIn 0.2s ease-out' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-zinc-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Change Location Address
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                aria-label="Close modal"
+              >
+                <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                Search address
+              </label>
+              <AddressAutocomplete
+                value={locationDraft.address}
+                onChange={(value) => setLocationDraft((prev) => ({ ...prev, address: value }))}
+                onCoordinatesChange={(lat, lng) =>
+                  setLocationDraft((prev) => ({ ...prev, latitude: lat, longitude: lng }))
+                }
+                placeholder="e.g., Athens, Greece"
+                locale={locale}
+                className="block w-full rounded-xl border-0 bg-gray-50/80 px-4 py-3 text-base text-gray-900 transition-all duration-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:bg-zinc-800"
+              />
+
+              <div className="mt-4">
+                <OpenStreetMapPicker
+                  address={locationDraft.address}
+                  onLocationChange={(address, lat, lng) =>
+                    setLocationDraft({ address, latitude: lat, longitude: lng })
+                  }
+                  locale={locale}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 border-t border-gray-100 px-5 py-4 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(false)}
+                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileData((prev) => ({
+                    ...prev,
+                    businessLocation: locationDraft.address,
+                    businessLatitude: locationDraft.latitude,
+                    businessLongitude: locationDraft.longitude,
+                  }))
+                  setShowLocationModal(false)
+                }}
+                disabled={!locationDraft.address.trim()}
+                className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
+              >
+                Use This Location
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Coupon Confirmation Modal */}
+      {deletingCouponId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeleting) {
+              setDeletingCouponId(null)
+            }
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm dark:bg-black/70"></div>
+
+          {/* Modal */}
+          <div
+            className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
+            style={{ animation: 'scaleIn 0.2s ease-out' }}
+          >
+            <div className="p-5 sm:p-6">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" stroke="currentColor">
+                  <path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z" />
+                </svg>
+              </div>
+
+              <h3 className="mt-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
+                Delete coupon?
+              </h3>
+              <p className="mt-2 text-center text-sm text-gray-600 dark:text-zinc-400">
+                &quot;{coupons.find((c) => c.id === deletingCouponId)?.title}&quot; will be permanently
+                deleted. This action cannot be undone.
+              </p>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeletingCouponId(null)}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCoupon(deletingCouponId)}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Coupon Type Selection Modal - Always available */}
       {showTypeSelection && (
