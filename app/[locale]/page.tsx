@@ -129,7 +129,7 @@ export default function HomePage({ params }: { params: Promise<{ locale: string 
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navigation />
       
-      {/* Hero Section */}
+      {/* Hero Sectionn */}
       <section className="flex min-h-screen items-center bg-white dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 dark:bg-gradient-to-br">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
           <div className="grid gap-8 lg:grid-cols-3 lg:gap-12">
